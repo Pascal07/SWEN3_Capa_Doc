@@ -1,0 +1,26 @@
+info:
+  name: Delete Document
+  type: http
+  seq: 1
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/documents/{{documentId}}"
+
+runtime:
+  variables:
+    - name: baseUrl
+      value: http://localhost:8080
+  scripts:
+    - type: tests
+      code: |-
+        test("status is 204 No Content", function () {
+          expect(res.getStatus()).to.equal(204);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

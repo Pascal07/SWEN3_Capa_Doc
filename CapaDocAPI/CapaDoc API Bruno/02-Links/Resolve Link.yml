@@ -1,0 +1,43 @@
+info:
+  name: Resolve Link
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/links/{{shortCode}}?password=secret123"
+  params:
+    - name: password
+      value: secret123
+      type: query
+
+runtime:
+  variables:
+    - name: baseUrl
+      value: http://localhost:8080
+  scripts:
+    - type: tests
+      code: |-
+        test("status is 200 OK", function () {
+            expect(res.getStatus()).to.equal(200);
+          });
+
+          test("response contains the shared document with correct fields", function () {
+            const body = res.getBody();
+            expect(body.id).to.exist;
+            expect(body.filename).to.exist;
+            expect(body.contentType).to.exist;
+            expect(body.sizeBytes).to.exist;
+          });
+
+          test("returned document matches the one the link belongs to", function () {
+            const body = res.getBody();
+            expect(String(body.id)).to.equal(String(bru.getVar("documentId")));
+          });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

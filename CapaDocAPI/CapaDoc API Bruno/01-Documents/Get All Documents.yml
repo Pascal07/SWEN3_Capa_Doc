@@ -1,0 +1,57 @@
+info:
+  name: Get All Documents
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/documents"
+
+runtime:
+  variables:
+    - name: baseUrl
+      value: http://localhost:8080
+  scripts:
+    - type: tests
+      code: |-
+        test("status is 200 OK", function () {
+            expect(res.getStatus()).to.equal(200);
+          });
+
+          test("response is an array", function () {
+            const body = res.getBody();
+            expect(body).to.be.an("array");
+          });
+
+          test("each document has the expected fields", function () {
+            const body = res.getBody();
+            body.forEach((doc) => {
+              expect(doc).to.have.property("id");
+              expect(doc).to.have.property("filename");
+              expect(doc).to.have.property("contentType");
+              expect(doc).to.have.property("sizeBytes");
+              expect(doc).to.have.property("uploadedAt");
+            });
+          });
+
+          test("created document is present in the list", function () {
+            const body = res.getBody();
+            const ids = body.map((d) => d.id);
+            expect(ids).to.include(bru.getVar("documentId"));
+          });
+
+         test("created document has non-null filename, contentType, sizeBytes", function () {
+          const body = res.getBody();
+          const created = body.find((d) => d.id === bru.getVar("documentId"));
+          expect(created).to.not.be.undefined;
+          expect(created.filename).to.exist;
+          expect(created.contentType).to.exist;
+          expect(created.sizeBytes).to.exist;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

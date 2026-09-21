@@ -1,0 +1,65 @@
+info:
+  name: Create Share Link
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/documents/{{documentId}}/links"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "password": "secret123",
+        "expiryDate": "2026-12-31T23:59:59"
+      }
+
+runtime:
+  variables:
+    - name: baseUrl
+      value: http://localhost:8080
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 201 || res.getStatus() === 200) {
+          const body = res.getBody();
+          bru.setVar("linkId", body.id);
+          bru.setVar("shortCode", body.shortCode);
+        }
+    - type: tests
+      code: |-
+        test("status is 201 Created", function () {
+            expect(res.getStatus()).to.equal(201);
+          });
+
+          test("response has id", function () {
+            const body = res.getBody();
+            expect(body.id).to.exist;
+          });
+
+          test("response contains a non-empty shortCode", function () {
+            const body = res.getBody();
+            expect(body.shortCode).to.exist;
+            expect(body.shortCode.length).to.be.greaterThan(0);
+          });
+
+          test("response contains expiryDate", function () {
+            const body = res.getBody();
+            expect(body.expiryDate).to.exist;
+          });
+
+          test("response does NOT leak password or passwordHash", function () {
+            const body = res.getBody();
+            expect(body.password).to.not.exist;
+            expect(body.passwordHash).to.not.exist;
+          });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

@@ -1,0 +1,78 @@
+info:
+  name: Create Document
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/documents"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "filename": "HelloWorld.pdf",
+        "contentType": "application/pdf",
+        "sizeBytes": 10240
+      }
+
+runtime:
+  variables:
+    - name: baseUrl
+      value: http://localhost:8080
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 201 || res.getStatus() === 200) {
+          const body = res.getBody();
+          bru.setVar("documentId", body.id);
+        }
+    - type: tests
+      code: |-
+        test("status is 201 Created", function () {
+          expect(res.getStatus()).to.equal(201);
+        });
+
+        test("response contains id", function () {
+          const body = res.getBody();
+          expect(body).to.have.property("id");
+        });
+
+        test("response contains filename", function () {
+          const body = res.getBody();
+          expect(body).to.have.property("filename");
+        });
+
+        test("response contains contentType", function () {
+          const body = res.getBody();
+          expect(body).to.have.property("contentType");
+        });
+
+        test("response contains sizeBytes", function () {
+          const body = res.getBody();
+          expect(body).to.have.property("sizeBytes");
+        });
+
+        test("response contains uploadedAt", function () {
+          const body = res.getBody();
+          expect(body).to.have.property("uploadedAt");
+        });
+
+        test("filename matches request", function () {
+          const body = res.getBody();
+          expect(body.filename).to.equal("HelloWorld.pdf");
+        });
+
+        test("sizeBytes matches request", function () {
+          const body = res.getBody();
+          expect(body.sizeBytes).to.equal("10240");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

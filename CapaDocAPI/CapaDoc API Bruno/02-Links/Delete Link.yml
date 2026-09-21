@@ -1,0 +1,31 @@
+info:
+  name: Delete Link
+  type: http
+  seq: 5
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/links/{{linkId}}"
+
+runtime:
+  variables:
+    - name: baseUrl
+      value: http://localhost:8080
+  scripts:
+    - type: tests
+      code: |-
+        test("status is 204 No Content", function () {
+            expect(res.getStatus()).to.equal(204);
+          });
+
+          test("link is actually gone (resolving it now 404s)", function () {
+            // optional follow-up check — only works if you chain a second request
+            // after this one that GETs /links/{{shortCode}} and expects 404
+          });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
