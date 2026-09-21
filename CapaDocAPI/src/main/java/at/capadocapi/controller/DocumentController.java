@@ -1,18 +1,12 @@
 package at.capadocapi.controller;
 
-import at.capadocapi.model.Document;
+import at.capadocapi.model.DocumentEntity;
 import at.capadocapi.service.DocumentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -24,28 +18,47 @@ public class DocumentController {
     private final DocumentService documentService;
 
     @GetMapping
-    public ResponseEntity<List<Document>> getAllDocuments() {
-        return ResponseEntity.ok(documentService.getAllDocuments());
+    public ResponseEntity<List<at.capadocapi.model.dto.DocumentResponseDTO>> getAllDocuments() {
+        List<at.capadocapi.model.dto.DocumentResponseDTO> response = documentService.getAllDocuments()
+                .stream()
+                .map(at.capadocapi.model.dto.DocumentResponseDTO::from)
+                .toList();
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Document> getDocumentById(@PathVariable Long id) {
+    public ResponseEntity<at.capadocapi.model.dto.DocumentResponseDTO> getDocumentById(@PathVariable Long id) {
         return documentService.getDocumentById(id)
+                .map(at.capadocapi.model.dto.DocumentResponseDTO::from)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<Document> createDocument(@RequestBody Document document) {
-        Document created = documentService.createDocument(document);
-        return new ResponseEntity<>(created, HttpStatus.CREATED);
+    public ResponseEntity<at.capadocapi.model.dto.DocumentResponseDTO> createDocument(@Valid @RequestBody at.capadocapi.model.dto.DocumentRequestDTO request) {
+        DocumentEntity toCreate = DocumentEntity.builder()
+                .filename(request.getFilename())
+                .contentType(request.getContentType())
+                .sizeBytes(request.getSizeBytes())
+                .build();
+
+        DocumentEntity created = documentService.createDocument(toCreate);
+        return new ResponseEntity<>(at.capadocapi.model.dto.DocumentResponseDTO.from(created), HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Document> updateDocument(@PathVariable Long id, @RequestBody Document document) {
+    public ResponseEntity<at.capadocapi.model.dto.DocumentResponseDTO> updateDocument(
+            @PathVariable Long id,
+            @Valid @RequestBody at.capadocapi.model.dto.DocumentRequestDTO request) {
         try {
-            Document updated = documentService.updateDocument(id, document);
-            return ResponseEntity.ok(updated);
+            DocumentEntity toUpdate = DocumentEntity.builder()
+                    .filename(request.getFilename())
+                    .contentType(request.getContentType())
+                    .sizeBytes(request.getSizeBytes())
+                    .build();
+
+            DocumentEntity updated = documentService.updateDocument(id, toUpdate);
+            return ResponseEntity.ok(at.capadocapi.model.dto.DocumentResponseDTO.from(updated));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }

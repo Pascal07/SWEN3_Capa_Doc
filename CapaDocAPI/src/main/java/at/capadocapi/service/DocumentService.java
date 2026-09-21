@@ -1,6 +1,6 @@
 package at.capadocapi.service;
 
-import at.capadocapi.model.Document;
+import at.capadocapi.model.DocumentEntity;
 import at.capadocapi.repository.DocumentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,28 +15,26 @@ public class DocumentService {
 
     private final DocumentRepository documentRepository;
 
-    public List<Document> getAllDocuments() {
+    public List<DocumentEntity> getAllDocuments() {
         return documentRepository.findAll();
     }
 
-    public Optional<Document> getDocumentById(Long id) {
+    public Optional<DocumentEntity> getDocumentById(Long id) {
         return documentRepository.findById(id);
     }
 
-    public Document createDocument(Document document) {
-        document.setCreatedAt(LocalDateTime.now());
-        document.setUpdatedAt(LocalDateTime.now());
-        return documentRepository.save(document);
+    public DocumentEntity createDocument(DocumentEntity documentEntity) {
+        documentEntity.setUploadedAt(LocalDateTime.now());
+        return documentRepository.save(documentEntity);
     }
 
-    public Document updateDocument(Long id, Document updatedDocument) {
+    public DocumentEntity updateDocument(Long id, DocumentEntity updatedDocumentEntity) {
         return documentRepository.findById(id)
-                .map(existingDocument -> {
-                    existingDocument.setTitle(updatedDocument.getTitle());
-                    existingDocument.setDescription(updatedDocument.getDescription());
-                    existingDocument.setContent(updatedDocument.getContent());
-                    existingDocument.setUpdatedAt(LocalDateTime.now());
-                    return documentRepository.save(existingDocument);
+                .map(existingDocumentEntity -> {
+                    existingDocumentEntity.setFilename(updatedDocumentEntity.getFilename());
+                    existingDocumentEntity.setContentType(updatedDocumentEntity.getContentType());
+                    existingDocumentEntity.setSizeBytes(updatedDocumentEntity.getSizeBytes());
+                    return documentRepository.save(existingDocumentEntity);
                 })
                 .orElseThrow(() -> new IllegalArgumentException("Document not found with id: " + id));
     }
