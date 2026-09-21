@@ -1,0 +1,514 @@
+opencollection: 1.0.0
+info:
+  name: CapaDoc API Bruno
+config:
+  proxy:
+    inherit: true
+    config:
+      protocol: http
+      hostname: ''
+      port: ''
+      auth:
+        username: ''
+        password: ''
+      bypassProxy: ''
+  environments:
+    - name: Local
+      variables:
+        - name: baseUrl
+          value: http://localhost:8081
+items:
+  - info:
+      name: Ping
+      type: http
+      seq: 2
+    http:
+      method: GET
+      url: http://localhost:8080/api/ping
+      auth: inherit
+    runtime:
+      variables:
+        - name: baseUrl
+          value: http://localhost:8080
+    settings:
+      encodeUrl: true
+      timeout: 0
+      followRedirects: true
+      maxRedirects: 5
+      forwardAuthorizationHeader: false
+  - info:
+      name: 01-Documents
+      type: folder
+      seq: 3
+    items:
+      - info:
+          name: Create Document
+          type: http
+          seq: 1
+        http:
+          method: POST
+          url: http://localhost:8080/api/documents
+          headers:
+            - name: Content-Type
+              value: application/json
+          body:
+            type: json
+            data: |-
+              {
+                "filename": "HelloWorld.pdf",
+                "contentType": "application/pdf",
+                "sizeBytes": 10240
+              }
+        runtime:
+          variables:
+            - name: baseUrl
+              value: http://localhost:8080
+          scripts:
+            - type: after-response
+              code: |-
+                if (res.getStatus() === 201 || res.getStatus() === 200) {
+                  const body = res.getBody();
+                  bru.setVar("documentId", body.id);
+                }
+            - type: tests
+              code: |-
+                test("status is 201 Created", function () {
+                  expect(res.getStatus()).to.equal(201);
+                });
+
+                test("response contains id", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("id");
+                });
+
+                test("response contains filename", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("filename");
+                });
+
+                test("response contains contentType", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("contentType");
+                });
+
+                test("response contains sizeBytes", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("sizeBytes");
+                });
+
+                test("response contains uploadedAt", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("uploadedAt");
+                });
+
+                test("filename matches request", function () {
+                  const body = res.getBody();
+                  expect(body.filename).to.equal("HelloWorld.pdf");
+                });
+
+                test("sizeBytes matches request", function () {
+                  const body = res.getBody();
+                  expect(body.sizeBytes).to.equal("10240");
+                });
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+          forwardAuthorizationHeader: true
+      - info:
+          name: Get All Documents
+          type: http
+          seq: 2
+        http:
+          method: GET
+          url: http://localhost:8080/api/documents
+        runtime:
+          scripts:
+            - type: tests
+              code: |-
+                test("status is 200 OK", function () {
+                    expect(res.getStatus()).to.equal(200);
+                  });
+
+                  test("response is an array", function () {
+                    const body = res.getBody();
+                    expect(body).to.be.an("array");
+                  });
+
+                  test("each document has the expected fields", function () {
+                    const body = res.getBody();
+                    body.forEach((doc) => {
+                      expect(doc).to.have.property("id");
+                      expect(doc).to.have.property("filename");
+                      expect(doc).to.have.property("contentType");
+                      expect(doc).to.have.property("sizeBytes");
+                      expect(doc).to.have.property("uploadedAt");
+                    });
+                  });
+
+                  test("created document is present in the list", function () {
+                    const body = res.getBody();
+                    const ids = body.map((d) => d.id);
+                    expect(ids).to.include(bru.getVar("documentId"));
+                  });
+
+                 test("created document has non-null filename, contentType, sizeBytes", function () {
+                  const body = res.getBody();
+                  const created = body.find((d) => d.id === bru.getVar("documentId"));
+                  expect(created).to.not.be.undefined;
+                  expect(created.filename).to.exist;
+                  expect(created.contentType).to.exist;
+                  expect(created.sizeBytes).to.exist;
+                });
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+          forwardAuthorizationHeader: true
+      - info:
+          name: Get Document by Id
+          type: http
+          seq: 3
+        http:
+          method: GET
+          url: http://localhost:8080/api/documents/{{documentId}}
+        runtime:
+          scripts:
+            - type: tests
+              code: |-
+                test("status is 200 OK", function () {
+                  expect(res.getStatus()).to.equal(200);
+                });
+
+                test("response contains id", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("id");
+                });
+
+                test("response contains filename", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("filename");
+                });
+
+                test("response contains contentType", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("contentType");
+                });
+
+                test("response contains sizeBytes", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("sizeBytes");
+                });
+
+                test("response contains uploadedAt", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("uploadedAt");
+                });
+
+                test("returned document has the requested id", function () {
+                  const body = res.getBody();
+                  expect(String(body.id)).to.equal(String(bru.getVar("documentId")));
+                });
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+          forwardAuthorizationHeader: true
+      - info:
+          name: Update Document
+          type: http
+          seq: 4
+        http:
+          method: PUT
+          url: http://localhost:8080/api/documents/{{documentId}}
+          headers:
+            - name: Content-Type
+              value: application/json
+          body:
+            type: json
+            data: |-
+              {
+                "filename": "HelloWorld-renamed.pdf",
+                "contentType": "application/pdf",
+                "sizeBytes": 10240
+              }
+        runtime:
+          scripts:
+            - type: tests
+              code: |-
+                test("status is 200 OK", function () {
+                  expect(res.getStatus()).to.equal(200);
+                });
+
+                test("response contains id", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("id");
+                });
+
+                test("response contains filename", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("filename");
+                });
+
+                test("response contains contentType", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("contentType");
+                });
+
+                test("response contains sizeBytes", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("sizeBytes");
+                });
+
+                test("response contains uploadedAt", function () {
+                  const body = res.getBody();
+                  expect(body).to.have.property("uploadedAt");
+                });
+
+                test("filename was updated", function () {
+                  const body = res.getBody();
+                  expect(body.filename).to.equal("HelloWorld-renamed.pdf");
+                });
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+          forwardAuthorizationHeader: true
+      - info:
+          name: Get Document Not Found
+          type: http
+          seq: 5
+        http:
+          method: GET
+          url: http://localhost:8080/api/documents/999999
+        runtime:
+          scripts:
+            - type: tests
+              code: |-
+                test("status is 404 Not Found", function () {
+                  expect(res.getStatus()).to.equal(404);
+                });
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+          forwardAuthorizationHeader: true
+  - info:
+      name: 02-Links
+      type: folder
+      seq: 4
+    items:
+      - info:
+          name: Create Share Link
+          type: http
+          seq: 1
+        http:
+          method: POST
+          url: http://localhost:8080/api/documents/{{documentId}}/links
+          headers:
+            - name: Content-Type
+              value: application/json
+          body:
+            type: json
+            data: |-
+              {
+                "password": "secret123",
+                "expiryDate": "2026-12-31T23:59:59"
+              }
+        runtime:
+          scripts:
+            - type: after-response
+              code: |-
+                if (res.getStatus() === 201 || res.getStatus() === 200) {
+                  const body = res.getBody();
+                  bru.setVar("linkId", body.id);
+                  bru.setVar("shortCode", body.shortCode);
+                }
+            - type: tests
+              code: |-
+                test("status is 201 Created", function () {
+                    expect(res.getStatus()).to.equal(201);
+                  });
+
+                  test("response has id", function () {
+                    const body = res.getBody();
+                    expect(body.id).to.exist;
+                  });
+
+                  test("response contains a non-empty shortCode", function () {
+                    const body = res.getBody();
+                    expect(body.shortCode).to.exist;
+                    expect(body.shortCode.length).to.be.greaterThan(0);
+                  });
+
+                  test("response contains expiryDate", function () {
+                    const body = res.getBody();
+                    expect(body.expiryDate).to.exist;
+                  });
+
+                  test("response does NOT leak password or passwordHash", function () {
+                    const body = res.getBody();
+                    expect(body.password).to.not.exist;
+                    expect(body.passwordHash).to.not.exist;
+                  });
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+          forwardAuthorizationHeader: true
+      - info:
+          name: Resolve Link
+          type: http
+          seq: 2
+        http:
+          method: GET
+          url: http://localhost:8080/api/links/{{shortCode}}?password=secret123
+          params:
+            - name: password
+              value: secret123
+              type: query
+        runtime:
+          scripts:
+            - type: tests
+              code: |-
+                test("status is 200 OK", function () {
+                    expect(res.getStatus()).to.equal(200);
+                  });
+
+                  test("response contains the shared document with correct fields", function () {
+                    const body = res.getBody();
+                    expect(body.id).to.exist;
+                    expect(body.filename).to.exist;
+                    expect(body.contentType).to.exist;
+                    expect(body.sizeBytes).to.exist;
+                  });
+
+                  test("returned document matches the one the link belongs to", function () {
+                    const body = res.getBody();
+                    expect(String(body.id)).to.equal(String(bru.getVar("documentId")));
+                  });
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+          forwardAuthorizationHeader: true
+      - info:
+          name: Resolve Link Wrong Password
+          type: http
+          seq: 3
+        http:
+          method: GET
+          url: http://localhost:8080/api/links/{{shortCode}}?password=wrongpassword
+          params:
+            - name: password
+              value: wrongpassword
+              type: query
+        runtime:
+          scripts:
+            - type: tests
+              code: |-
+                test("status is 401 Unauthorized", function () {
+                    expect(res.getStatus()).to.equal(401);
+                  });
+
+                  test("no document data is leaked on wrong password", function () {
+                    const body = res.getBody();
+                    if (body) {
+                      expect(body.filename).to.not.exist;
+                    }
+                  });
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+          forwardAuthorizationHeader: true
+      - info:
+          name: Resolve Link Not Found
+          type: http
+          seq: 4
+        http:
+          method: GET
+          url: http://localhost:8080/api/links/does-not-exist?password=whatever
+          params:
+            - name: password
+              value: whatever
+              type: query
+        runtime:
+          scripts:
+            - type: tests
+              code: |-
+                test("status is 404 Not Found", function () {
+                    expect(res.getStatus()).to.equal(404);
+                  });
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+          forwardAuthorizationHeader: true
+      - info:
+          name: Delete Link
+          type: http
+          seq: 5
+        http:
+          method: DELETE
+          url: http://localhost:8080/api/links/{{linkId}}
+        runtime:
+          scripts:
+            - type: tests
+              code: |-
+                test("status is 204 No Content", function () {
+                    expect(res.getStatus()).to.equal(204);
+                  });
+
+                  test("link is actually gone (resolving it now 404s)", function () {
+                    // optional follow-up check — only works if you chain a second request
+                    // after this one that GETs /links/{{shortCode}} and expects 404
+                  });
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+          forwardAuthorizationHeader: true
+  - info:
+      name: 03-Cleanup
+      type: folder
+      seq: 5
+    items:
+      - info:
+          name: Delete Document
+          type: http
+          seq: 1
+        http:
+          method: DELETE
+          url: http://localhost:8080/api/documents/{{documentId}}
+        runtime:
+          scripts:
+            - type: tests
+              code: |-
+                test("status is 204 No Content", function () {
+                  expect(res.getStatus()).to.equal(204);
+                });
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+          forwardAuthorizationHeader: true
+bundled: true
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git
+    exportedAt: '2026-09-21T11:31:57.931Z'
+    exportedUsing: Bruno
