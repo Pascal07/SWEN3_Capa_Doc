@@ -10,7 +10,7 @@ http:
 runtime:
   variables:
     - name: baseUrl
-      value: http://localhost:8080
+      value: http://localhost:8081
     - name: documentId
       value: "1"
   scripts:

@@ -21,7 +21,7 @@ http:
 runtime:
   variables:
     - name: baseUrl
-      value: http://localhost:8080
+      value: http://localhost:8081
   scripts:
     - type: tests
       code: |-

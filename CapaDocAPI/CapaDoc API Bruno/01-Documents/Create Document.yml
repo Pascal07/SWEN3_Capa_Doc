@@ -21,7 +21,7 @@ http:
 runtime:
   variables:
     - name: baseUrl
-      value: http://localhost:8080
+      value: http://localhost:8081
   scripts:
     - type: after-response
       code: |-
@@ -67,7 +67,7 @@ runtime:
 
         test("sizeBytes matches request", function () {
           const body = res.getBody();
-          expect(body.sizeBytes).to.equal("10240");
+          expect(body.sizeBytes).to.equal(10240);
         });
 
 settings:
