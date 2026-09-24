@@ -1,7 +1,9 @@
 package at.capadocapi.controller;
 
 import at.capadocapi.model.DocumentEntity;
-import at.capadocapi.service.DocumentService;
+import at.capadocapi.model.dto.DocumentRequestDTO;
+import at.capadocapi.model.dto.DocumentResponseDTO;
+import at.capadocapi.service.Interfaces.DocumentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,24 +20,24 @@ public class DocumentController {
     private final DocumentService documentService;
 
     @GetMapping
-    public ResponseEntity<List<at.capadocapi.model.dto.DocumentResponseDTO>> getAllDocuments() {
-        List<at.capadocapi.model.dto.DocumentResponseDTO> response = documentService.getAllDocuments()
+    public ResponseEntity<List<DocumentResponseDTO>> getAllDocuments() {
+        List<DocumentResponseDTO> response = documentService.getAllDocuments()
                 .stream()
-                .map(at.capadocapi.model.dto.DocumentResponseDTO::from)
+                .map(DocumentResponseDTO::from)
                 .toList();
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<at.capadocapi.model.dto.DocumentResponseDTO> getDocumentById(@PathVariable Long id) {
+    public ResponseEntity<DocumentResponseDTO> getDocumentById(@PathVariable Long id) {
         return documentService.getDocumentById(id)
-                .map(at.capadocapi.model.dto.DocumentResponseDTO::from)
+                .map(DocumentResponseDTO::from)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<at.capadocapi.model.dto.DocumentResponseDTO> createDocument(@Valid @RequestBody at.capadocapi.model.dto.DocumentRequestDTO request) {
+    public ResponseEntity<DocumentResponseDTO> createDocument(@Valid @RequestBody DocumentRequestDTO request) {
         DocumentEntity toCreate = DocumentEntity.builder()
                 .filename(request.getFilename())
                 .contentType(request.getContentType())
@@ -43,13 +45,13 @@ public class DocumentController {
                 .build();
 
         DocumentEntity created = documentService.createDocument(toCreate);
-        return new ResponseEntity<>(at.capadocapi.model.dto.DocumentResponseDTO.from(created), HttpStatus.CREATED);
+        return new ResponseEntity<>(DocumentResponseDTO.from(created), HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<at.capadocapi.model.dto.DocumentResponseDTO> updateDocument(
+    public ResponseEntity<DocumentResponseDTO> updateDocument(
             @PathVariable Long id,
-            @Valid @RequestBody at.capadocapi.model.dto.DocumentRequestDTO request) {
+            @Valid @RequestBody DocumentRequestDTO request) {
         try {
             DocumentEntity toUpdate = DocumentEntity.builder()
                     .filename(request.getFilename())
@@ -58,7 +60,7 @@ public class DocumentController {
                     .build();
 
             DocumentEntity updated = documentService.updateDocument(id, toUpdate);
-            return ResponseEntity.ok(at.capadocapi.model.dto.DocumentResponseDTO.from(updated));
+            return ResponseEntity.ok(DocumentResponseDTO.from(updated));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }

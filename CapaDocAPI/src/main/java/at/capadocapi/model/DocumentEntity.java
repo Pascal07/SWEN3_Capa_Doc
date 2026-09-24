@@ -29,6 +29,8 @@ public class DocumentEntity {
 
     // m:n relation to ShareLink – owning side lives here
     @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE })
     @JoinTable(
             name = "document_share_links",

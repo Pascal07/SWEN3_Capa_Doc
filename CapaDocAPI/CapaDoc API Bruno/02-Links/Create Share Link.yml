@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/api/documents/{{documentId}}/links"
+  url: "{{baseUrl}}/api/links/create/{{documentId}}/"
   headers:
     - name: Content-Type
       value: application/json

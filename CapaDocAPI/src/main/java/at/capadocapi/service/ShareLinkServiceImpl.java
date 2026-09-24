@@ -10,9 +10,11 @@ import at.capadocapi.model.DocumentEntity;
 import at.capadocapi.model.ShareLinkEntity;
 import at.capadocapi.repository.DocumentRepository;
 import at.capadocapi.repository.ShareLinkRepository;
+import at.capadocapi.service.Interfaces.ShareLinkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -20,7 +22,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class ShareLinkService {
+public class ShareLinkServiceImpl implements ShareLinkService {
 
     private static final String SHORT_CODE_ALPHABET =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -31,7 +33,9 @@ public class ShareLinkService {
     private final PasswordEncoder passwordEncoder;
     private final SecureRandom random = new SecureRandom();
 
-    // POST /documents/{documentId}/links
+    // POST /documents/{documentId}/links or /api/links/create/{documentId}
+    @Override
+    @Transactional
     public ShareLinkResponseDTO createShareLink(Long documentId, ShareLinkRequestDTO request) {
         DocumentEntity document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found with id: " + documentId));
@@ -42,14 +46,18 @@ public class ShareLinkService {
                 .expiryDate(request.getExpiryDate())
                 .build();
 
+        ShareLinkEntity savedLink = shareLinkRepository.save(link);
+
         // DocumentEntity owns the join table, so the link must be added on that side
-        document.getShareLinks().add(link);
+        document.getShareLinks().add(savedLink);
         documentRepository.save(document);
 
-        return ShareLinkResponseDTO.from(link);
+        return ShareLinkResponseDTO.from(savedLink);
     }
 
     // GET /links/{shortCode}?password=...
+    @Override
+    @Transactional(readOnly = true)
     public List<DocumentResponseDTO> resolveLink(String shortCode, String password) {
         ShareLinkEntity link = shareLinkRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new ShareLinkNotFoundException(shortCode));
@@ -68,6 +76,8 @@ public class ShareLinkService {
     }
 
     // DELETE /links/{id}
+    @Override
+    @Transactional
     public void deleteShareLink(Long id) {
         ShareLinkEntity link = shareLinkRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Share link not found with id: " + id));

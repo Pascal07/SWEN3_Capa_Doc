@@ -32,6 +32,8 @@ public class ShareLinkEntity {
 
     // inverse side of the m:n relation – DocumentEntity owns the join table
     @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     @ManyToMany(mappedBy = "shareLinks")
     private Set<DocumentEntity> documents = new HashSet<>();
 
