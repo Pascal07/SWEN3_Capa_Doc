@@ -23,13 +23,4 @@ public class DocumentResponseDTO {
     private Long sizeBytes;
     private LocalDateTime uploadedAt;
 
-    public static at.capadocapi.model.dto.DocumentResponseDTO from(DocumentEntity documentEntity) {
-        return at.capadocapi.model.dto.DocumentResponseDTO.builder()
-                .id(documentEntity.getId())
-                .filename(documentEntity.getFilename())
-                .contentType(documentEntity.getContentType())
-                .sizeBytes(documentEntity.getSizeBytes())
-                .uploadedAt(documentEntity.getUploadedAt())
-                .build();
-    }
 }

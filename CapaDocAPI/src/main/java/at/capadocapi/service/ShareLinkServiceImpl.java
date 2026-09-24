@@ -1,5 +1,7 @@
 package at.capadocapi.service;
 
+import at.capadocapi.mapper.DocumentMapper;
+import at.capadocapi.mapper.ShareLinkMapper;
 import at.capadocapi.model.dto.DocumentResponseDTO;
 import at.capadocapi.model.dto.ShareLinkRequestDTO;
 import at.capadocapi.model.dto.ShareLinkResponseDTO;
@@ -32,6 +34,8 @@ public class ShareLinkServiceImpl implements ShareLinkService {
     private final DocumentRepository documentRepository;
     private final PasswordEncoder passwordEncoder;
     private final SecureRandom random = new SecureRandom();
+    private final DocumentMapper documentMapper;
+    private final ShareLinkMapper shareLinkMapper;
 
     // POST /documents/{documentId}/links or /api/links/create/{documentId}
     @Override
@@ -40,11 +44,9 @@ public class ShareLinkServiceImpl implements ShareLinkService {
         DocumentEntity document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found with id: " + documentId));
 
-        ShareLinkEntity link = ShareLinkEntity.builder()
-                .shortCode(generateUniqueShortCode())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .expiryDate(request.getExpiryDate())
-                .build();
+        ShareLinkEntity link = shareLinkMapper.toEntity(request);
+        link.setShortCode(generateUniqueShortCode());
+        link.setPasswordHash(passwordEncoder.encode(request.getPassword()));
 
         ShareLinkEntity savedLink = shareLinkRepository.save(link);
 
@@ -52,7 +54,7 @@ public class ShareLinkServiceImpl implements ShareLinkService {
         document.getShareLinks().add(savedLink);
         documentRepository.save(document);
 
-        return ShareLinkResponseDTO.from(savedLink);
+        return shareLinkMapper.toResponseDto(savedLink);
     }
 
     // GET /links/{shortCode}?password=...
@@ -71,7 +73,7 @@ public class ShareLinkServiceImpl implements ShareLinkService {
         }
 
         return link.getDocuments().stream()
-                .map(DocumentResponseDTO::from)
+                .map(documentMapper::toResponseDto)
                 .toList();
     }
 

@@ -21,12 +21,4 @@ public class ShareLinkResponseDTO {
     private LocalDateTime expiryDate;
     private LocalDateTime createdAt;
 
-    public static ShareLinkResponseDTO from(ShareLinkEntity link) {
-        return ShareLinkResponseDTO.builder()
-                .id(link.getId())
-                .shortCode(link.getShortCode())
-                .expiryDate(link.getExpiryDate())
-                .createdAt(link.getCreatedAt())
-                .build();
-    }
 }
