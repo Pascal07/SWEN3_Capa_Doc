@@ -8,8 +8,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-// Used as the response body for /links endpoints.
-// Deliberately has NO password/passwordHash field - never send that back to the client.
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

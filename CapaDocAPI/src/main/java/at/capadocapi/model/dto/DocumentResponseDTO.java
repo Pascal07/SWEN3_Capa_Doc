@@ -8,9 +8,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-// Used as the response body for /documents endpoints.
-// Deliberately does NOT expose entity internals (e.g. the shareLinks collection),
-// so there's no lazy-loading/serialization surprise once ShareLink is wired up.
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
