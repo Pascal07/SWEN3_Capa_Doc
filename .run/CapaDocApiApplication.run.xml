@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="CapaDocApiApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+    <envs>
+      <env name="DB_NAME" value="capadoc_db" />
+      <env name="DB_USER" value="capadoc_user" />
+      <env name="DB_PASSWORD" value="capa4ever" />
+    </envs>
+    <module name="CapaDocAPI" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="at.capadocapi.CapaDocApiApplication" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

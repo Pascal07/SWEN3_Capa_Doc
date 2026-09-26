@@ -28,6 +28,9 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public DocumentEntity createDocument(DocumentEntity documentEntity) {
+        if (documentEntity == null) {
+            throw new IllegalArgumentException("DocumentEntity must not be null");
+        }
         documentEntity.setUploadedAt(LocalDateTime.now());
         return documentRepository.save(documentEntity);
     }
