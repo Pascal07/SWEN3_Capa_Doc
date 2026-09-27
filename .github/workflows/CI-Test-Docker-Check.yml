@@ -35,7 +35,7 @@ jobs:
         run: ./mvnw --batch-mode clean test
 
       - name: Docker Compose bauen und starten
-        working-directory: CapaDocAPI
+        working-directory: ..
         run: docker compose up --build -d
 
       - name: Backend-Erreichbarkeit prüfen
