@@ -34,9 +34,11 @@ jobs:
         run: ./mvnw --batch-mode clean test
 
       - name: Docker Compose bauen und starten
+        working-directory: CapaDocAPI
         run: docker compose up --build -d
 
       - name: Backend-Erreichbarkeit prüfen
+        working-directory: CapaDocAPI
         run: |
           echo "Warte auf das Backend..."
           timeout 90s bash -c '
@@ -48,8 +50,10 @@ jobs:
 
       - name: Compose-Logs bei Fehlern
         if: failure()
+        working-directory: CapaDocAPI
         run: docker compose logs --no-color
 
       - name: Aufräumen
         if: always()
+        working-directory: CapaDocAPI
         run: docker compose down -v
