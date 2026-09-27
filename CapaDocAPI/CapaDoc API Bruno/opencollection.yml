@@ -1,0 +1,55 @@
+opencollection: 1.0.0
+
+info:
+  name: CapaDoc API Bruno
+config:
+  proxy:
+    inherit: true
+    config:
+      protocol: http
+      hostname: ""
+      port: ""
+      auth:
+        username: ""
+        password: ""
+      bypassProxy: ""
+
+docs:
+  content: |
+    # CapaDoc API – Bruno Collection
+
+    Diese Collection testet die REST-API des CapaDoc Semester-Projekts (SWEN3/BIF5,
+    Document-Management-System mit Document-Sharing-Feature).
+
+    ## Zweck
+
+    Automatisierte Requests + Tests für die Endpoints aus Sprint 1 (REST API, DAL):
+
+    - **Documents** – Anlegen, Auflisten, Abrufen, Aktualisieren, Löschen von
+      Dokument-Metadaten (`/documents`)
+    - **Links** – Erstellen und Auflösen von passwortgeschützten, zeitlich
+      begrenzten Share-Links für Dokumente (`/documents/{id}/links`, `/links/{shortCode}`)
+
+    ## Umfang
+
+    - 12 Requests, davon Happy-Path- und Negativ-/Validierungsfälle
+      (400 Bad Request, 401 Unauthorized, 404 Not Found, 410 Gone)
+    - Jeder Request enthält automatisierte Tests (Statuscode + Response-Shape)
+    - Variablen (`documentId`, `linkId`, `shortCode`, ...) werden automatisch
+      zwischen den Requests weitergereicht
+
+    ## Nutzung
+
+    1. Environment (siehe "1 collection environment") auswählen und `baseUrl`
+       auf eure lokale API anpassen (`http://localhost:8080/api` o.ä.)
+    2. `01-Documents` und `02-Links` der Reihe nach über den Collection Runner
+       ausführen, oder einzeln testen
+    3. Bei rot markierten Tests: Response-Body mit den erwarteten Feldern
+       (`id`, `filename`, `contentType`, `sizeBytes`, `uploadedAt`) vergleichen
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git
