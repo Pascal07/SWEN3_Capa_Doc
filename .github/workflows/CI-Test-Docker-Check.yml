@@ -35,7 +35,7 @@ jobs:
         run: ./mvnw --batch-mode clean test
 
       - name: Docker Compose bauen und starten
-        working-directory: ..
+        working-directory: .
         run: docker compose up --build -d
 
       - name: Backend-Erreichbarkeit prüfen
@@ -51,10 +51,10 @@ jobs:
 
       - name: Compose-Logs bei Fehlern
         if: failure()
-        working-directory: CapaDocAPI
+        working-directory: .
         run: docker compose logs --no-color
 
       - name: Aufräumen
         if: always()
-        working-directory: CapaDocAPI
+        working-directory: .
         run: docker compose down -v
