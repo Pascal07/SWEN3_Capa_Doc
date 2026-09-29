@@ -35,5 +35,17 @@ services:
       db:
         condition: service_healthy
 
+  # --- Frontend ---
+  frontend:
+    build:
+      context: ./CapaDocFrontend
+      dockerfile: Dockerfile
+    container_name: capadoc-frontend
+    restart: unless-stopped
+    ports:
+      - "4200:80"
+    depends_on:
+      - api
+
 volumes:
   db-data:
