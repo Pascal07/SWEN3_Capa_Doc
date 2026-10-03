@@ -1,0 +1,53 @@
+:host,
+om-aurora {
+  display: block;
+  min-height: 100svh;
+}
+
+.landing {
+  box-sizing: border-box;
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  padding: 2rem;
+}
+
+.landing__content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 2rem;
+  text-align: center;
+}
+
+h1 {
+  margin: 0;
+  color: #203b2f;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(3.5rem, 12vw, 7rem);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.register-button {
+  min-height: 3.25rem;
+  padding: 0.75rem 1.5rem;
+  border: 0;
+  border-radius: 4px;
+  background: #678dc6;
+  color: #fff;
+  font: 600 1rem/1.2 Arial, sans-serif;
+  cursor: pointer;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.register-button:hover {
+  background: #4c71aa;
+  transform: translateY(-2px);
+}
+
+.register-button:focus-visible {
+  outline: 3px solid #152030;
+  outline-offset: 4px;
+}
