@@ -12,7 +12,7 @@ om-aurora {
   padding: 2rem;
 }
 
-.landing__content {
+.landing_content {
   position: relative;
   z-index: 1;
   display: grid;

@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { NgxAuroraComponent } from '@omnedia/ngx-aurora';
 
 @Component({
@@ -8,4 +9,10 @@ import { NgxAuroraComponent } from '@omnedia/ngx-aurora';
   templateUrl: './landing-page.html',
   styleUrl: './landing-page.css',
 })
-export class LandingPage {}
+export class LandingPage {
+  private readonly router = inject(Router);
+
+  protected continueToDashboard(): void {
+    void this.router.navigateByUrl('/dashboard');
+  }
+}

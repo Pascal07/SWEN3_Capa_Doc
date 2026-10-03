@@ -1,0 +1,92 @@
+:host {
+  display: block;
+  min-height: 100svh;
+  background: #fff;
+}
+
+.dashboard-header {
+  border-bottom: 1px solid #dfe5e2;
+  background: #fff;
+}
+
+.navbar {
+  display: flex;
+  min-height: 4rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0.75rem 2rem;
+}
+
+.navbar__links,
+.navbar__account {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.navbar__links {
+  flex-wrap: wrap;
+}
+
+.navbar__link {
+  color: #39443f;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.navbar__link--active {
+  color: #203b2f;
+  font-weight: 700;
+}
+
+.navbar__separator {
+  color: #aab4ae;
+  user-select: none;
+}
+
+.navbar__account {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.navbar__username {
+  color: #39443f;
+  font-size: 0.95rem;
+}
+
+.logout-button {
+  min-height: 2.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #cbd4cf;
+  border-radius: 4px;
+  background: #fff;
+  color: #203b2f;
+  font: 600 0.9rem/1.2 Arial, sans-serif;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  background: #f2f5f3;
+}
+
+.logout-button:focus-visible,
+.navbar__link:focus-visible {
+  outline: 3px solid #678dc6;
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .navbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .navbar__account {
+    align-self: flex-end;
+  }
+}
