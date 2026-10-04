@@ -1,2 +1,102 @@
 <app-navbar />
-<main class="page-canvas"></main>
+<main class="dashboard">
+	<div class="dashboard__inner">
+		<header class="dashboard__intro">
+			<div>
+				<p class="dashboard__eyebrow">DOKUMENTENBIBLIOTHEK</p>
+				<h1>Meine Dokumente</h1>
+				<p class="dashboard__subtitle">Deine Dateien an einem Ort.</p>
+			</div>
+			<div class="document-count" aria-label="Anzahl Dokumente">
+				{{ documents.length }} {{ documents.length === 1 ? 'Dokument' : 'Dokumente' }}
+			</div>
+		</header>
+
+		@if (errorMessage) {
+			<p class="message message--error" role="alert">{{ errorMessage }}</p>
+		}
+		@if (successMessage) {
+			<p class="message message--success" role="status">{{ successMessage }}</p>
+		}
+
+		<div class="dashboard__layout">
+			<section class="documents-panel" aria-labelledby="documents-heading">
+				<div class="panel-heading">
+					<div>
+						<h2 id="documents-heading">Dokumente</h2>
+						<p>Zuletzt hinzugefügte Dateien</p>
+					</div>
+					<button class="refresh-button" type="button" (click)="loadDocuments()" [disabled]="isLoading" aria-label="Dokumente neu laden" title="Neu laden">
+						↻
+					</button>
+				</div>
+
+				@if (isLoading) {
+					<p class="list-state" role="status">Dokumente werden geladen ...</p>
+				} @else if (documents.length === 0) {
+					<div class="list-state empty-state">
+						<span class="empty-state__mark" aria-hidden="true">PDF</span>
+						<h3>Noch keine Dokumente</h3>
+						<p>Füge rechts dein erstes PDF hinzu.</p>
+					</div>
+				} @else {
+					<ul class="document-list">
+						@for (document of documents; track document.id) {
+							<li class="document-row">
+								<span class="file-mark" aria-hidden="true">PDF</span>
+								<div class="document-row__details">
+									<h3>{{ document.filename }}</h3>
+									<p>{{ document.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</p>
+								</div>
+								<span class="document-row__size">{{ formatSize(document.sizeBytes) }}</span>
+								<button
+									class="delete-button"
+									type="button"
+									(click)="deleteDocument(document)"
+									[disabled]="deletingId === document.id"
+									[attr.aria-label]="'Dokument löschen: ' + document.filename">
+									{{ deletingId === document.id ? 'Lösche ...' : 'Löschen' }}
+								</button>
+							</li>
+						}
+					</ul>
+				}
+			</section>
+
+			<aside class="upload-panel" aria-labelledby="upload-heading">
+				<p class="upload-panel__eyebrow">NEU</p>
+				<h2 id="upload-heading">PDF hinzufügen</h2>
+				<p class="upload-panel__copy">Wähle ein Dokument von deinem Gerät aus.</p>
+
+				<form (ngSubmit)="createDocument(fileInput)">
+					<label class="file-field" for="document-file">
+						<span class="file-field__icon" aria-hidden="true">+</span>
+						<span class="file-field__label">PDF-Datei auswählen</span>
+						<span class="file-field__name">{{ selectedFile?.name ?? 'Keine Datei ausgewählt' }}</span>
+						<input
+							#fileInput
+							id="document-file"
+							name="document"
+							type="file"
+							accept=".pdf,application/pdf"
+							required
+							(change)="onFileSelected($event)"
+							[disabled]="isSubmitting">
+					</label>
+
+					@if (validationMessage) {
+						<p class="validation-message" role="alert">{{ validationMessage }}</p>
+					}
+
+					@if (selectedFile) {
+						<p class="file-summary">{{ formatSize(selectedFile.size) }} · PDF</p>
+					}
+
+					<button class="submit-button" type="submit" [disabled]="!selectedFile || isSubmitting">
+						{{ isSubmitting ? 'Wird hinzugefügt ...' : 'Dokument hinzufügen' }}
+					</button>
+				</form>
+			</aside>
+		</div>
+	</div>
+</main>
