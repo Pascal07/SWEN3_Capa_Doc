@@ -27,6 +27,9 @@ public class DocumentEntity {
 
     private LocalDateTime uploadedAt;
 
+    @Column(name = "owner_sub")
+    private String ownerSub;
+
     // m:n relation to ShareLink – owning side lives here
     @Builder.Default
     @ToString.Exclude

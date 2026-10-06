@@ -22,6 +22,10 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
+import org.springframework.security.test.context.support.WithMockUser;
+
 /**
  * Full-context MockMvc test for ShareLinkController.
  * ShareLinkServiceImpl is mocked so no real persistence/DB is required.
@@ -32,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@WithMockUser
 class ShareLinkControllerTest {
 
     @Autowired
@@ -77,6 +82,8 @@ class ShareLinkControllerTest {
                 .thenReturn(sampleResponse);
 
         mockMvc.perform(post("/api/links/create/{documentId}", 1L)
+                        .with(csrf())
+                        .with(oidcLogin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isCreated())
@@ -93,6 +100,8 @@ class ShareLinkControllerTest {
         invalid.setExpiryDate(LocalDateTime.now().plusDays(7));
 
         mockMvc.perform(post("/api/links/create/{documentId}", 1L)
+                        .with(csrf())
+                        .with(oidcLogin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalid)))
                 .andExpect(status().isBadRequest());
@@ -107,6 +116,8 @@ class ShareLinkControllerTest {
         invalid.setExpiryDate(null); // violates @NotNull
 
         mockMvc.perform(post("/api/links/create/{documentId}", 1L)
+                        .with(csrf())
+                        .with(oidcLogin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalid)))
                 .andExpect(status().isBadRequest());
@@ -121,6 +132,8 @@ class ShareLinkControllerTest {
         invalid.setExpiryDate(LocalDateTime.now().minusDays(1)); // violates @Future
 
         mockMvc.perform(post("/api/links/create/{documentId}", 1L)
+                        .with(csrf())
+                        .with(oidcLogin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalid)))
                 .andExpect(status().isBadRequest());
@@ -168,7 +181,7 @@ class ShareLinkControllerTest {
     void deleteShareLink_returns204() throws Exception {
         doNothing().when(shareLinkService).deleteShareLink(1L);
 
-        mockMvc.perform(delete("/api/links/{id}", 1L))
+        mockMvc.perform(delete("/api/links/{id}", 1L).with(csrf()).with(oidcLogin()))
                 .andExpect(status().isNoContent());
 
         verify(shareLinkService, times(1)).deleteShareLink(1L);

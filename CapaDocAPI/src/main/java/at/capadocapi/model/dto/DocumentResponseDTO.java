@@ -19,5 +19,6 @@ public class DocumentResponseDTO {
     private String contentType;
     private Long sizeBytes;
     private LocalDateTime uploadedAt;
+    private String ownerSub;
 
 }
