@@ -1,8 +1,10 @@
 name: Local
 variables:
   - name: baseUrl
-    value: http://localhost:4200
+    value: http://localhost:8081
   - secret: true
     name: sessionId
+    description: ""
   - secret: true
     name: xsrfToken
+    description: ""

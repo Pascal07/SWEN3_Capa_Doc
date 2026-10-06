@@ -8,9 +8,6 @@ http:
   url: "{{baseUrl}}/api/links/{{linkId}}"
 
 runtime:
-  variables:
-    - name: baseUrl
-      value: http://localhost:8081
   scripts:
     - type: tests
       code: |-

@@ -8,11 +8,6 @@ http:
   url: "{{baseUrl}}/api/ping"
   auth: inherit
 
-runtime:
-  variables:
-    - name: baseUrl
-      value: http://localhost:8081
-
 settings:
   encodeUrl: true
   timeout: 0

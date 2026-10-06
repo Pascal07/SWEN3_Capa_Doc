@@ -18,9 +18,6 @@ http:
       }
 
 runtime:
-  variables:
-    - name: baseUrl
-      value: http://localhost:8081
   scripts:
     - type: after-response
       code: |-
