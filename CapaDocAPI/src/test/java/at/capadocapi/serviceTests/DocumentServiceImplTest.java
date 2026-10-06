@@ -64,6 +64,22 @@ public class DocumentServiceImplTest {
         verify(documentRepository).findAll();
     }
 
+    @Test
+    void getDocumentsByOwner_documentsExist_returnsFilteredDocuments() {
+        DocumentEntity doc1 = new DocumentEntity();
+        doc1.setId(1L);
+        doc1.setFilename("test1.pdf");
+        doc1.setOwnerSub("sub-123");
+
+        when(documentRepository.findByOwnerSub("sub-123")).thenReturn(List.of(doc1));
+
+        List<DocumentEntity> result = documentService.getDocumentsByOwner("sub-123");
+
+        assertThat(result).hasSize(1);
+        assertThat(result).containsExactly(doc1);
+        verify(documentRepository).findByOwnerSub("sub-123");
+    }
+
 
     //  Test: Repository liefert Optional.of(document) → Service gibt dasselbe Document zurück
     @Test

@@ -6,6 +6,7 @@ import java.util.Optional;
 
 public interface DocumentService {
     List<DocumentEntity> getAllDocuments();
+    List<DocumentEntity> getDocumentsByOwner(String ownerSub);
     Optional<DocumentEntity> getDocumentById(Long id);
     DocumentEntity createDocument(DocumentEntity documentEntity);
     DocumentEntity updateDocument(Long id, DocumentEntity updatedDocumentEntity);

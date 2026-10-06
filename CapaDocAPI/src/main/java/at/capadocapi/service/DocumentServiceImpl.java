@@ -22,6 +22,11 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
+    public List<DocumentEntity> getDocumentsByOwner(String ownerSub) {
+        return documentRepository.findByOwnerSub(ownerSub);
+    }
+
+    @Override
     public Optional<DocumentEntity> getDocumentById(Long id) {
         return documentRepository.findById(id);
     }
