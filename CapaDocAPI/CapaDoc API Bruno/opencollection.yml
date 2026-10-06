@@ -14,6 +14,13 @@ config:
         password: ""
       bypassProxy: ""
 
+request:
+  headers:
+    - name: Cookie
+      value: "\tJSESSIONID={{sessionId}}; XSRF-TOKEN={{xsrfToken}}"
+    - name: X-XSRF-TOKEN
+      value: "{{xsrfToken}}"
+
 docs:
   content: |
     # CapaDoc API – Bruno Collection
