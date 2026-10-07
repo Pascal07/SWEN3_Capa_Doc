@@ -44,23 +44,12 @@
   font: 400 0.95rem/1.5 Arial, sans-serif;
 }
 
-.dashboard__layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 330px;
-  align-items: start;
-  gap: 1.25rem;
-}
-
-.documents-panel,
-.upload-panel {
+.documents-panel {
   box-sizing: border-box;
   border: 1px solid #dce4dc;
   border-radius: 6px;
   background: #fff;
-}
-
-.documents-panel {
-  min-height: 280px;
+  min-height: 420px;
   padding: 1.4rem 1.5rem;
 }
 
@@ -73,15 +62,13 @@
   border-bottom: 1px solid #e8ece8;
 }
 
-.panel-heading h2,
-.upload-panel h2 {
+.panel-heading h2 {
   margin: 0;
   color: #263a2f;
   font: 500 1.35rem/1.2 Georgia, 'Times New Roman', serif;
 }
 
-.panel-heading p,
-.upload-panel__copy {
+.panel-heading p {
   margin: 0.35rem 0 0;
   color: #778078;
   font: 400 0.84rem/1.5 Arial, sans-serif;
@@ -164,81 +151,6 @@
   text-align: center;
 }
 
-.upload-panel {
-  padding: 1.5rem;
-}
-
-.upload-panel__eyebrow {
-  color: #456596;
-}
-
-.upload-panel__copy {
-  margin: 0.55rem 0 1.3rem;
-}
-
-.file-field {
-  display: grid;
-  justify-items: center;
-  gap: 0.55rem;
-  padding: 1.1rem 0.75rem;
-  border: 1px dashed #b9c9bc;
-  border-radius: 4px;
-  background: #f8faf7;
-  cursor: pointer;
-  text-align: center;
-}
-
-.file-field:focus-within {
-  outline: 2px solid #557b61;
-  outline-offset: 2px;
-}
-
-.file-field__label {
-  color: #345441;
-  font: 600 0.86rem/1.3 Arial, sans-serif;
-}
-
-.file-field__name {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  color: #7b847d;
-  font: 400 0.75rem/1.4 Arial, sans-serif;
-}
-
-.file-field input {
-  width: 100%;
-  color: #616d64;
-  font: 400 0.72rem/1.4 Arial, sans-serif;
-}
-
-.file-summary,
-.validation-message {
-  margin: 0.65rem 0 0;
-  font: 400 0.78rem/1.4 Arial, sans-serif;
-}
-
-.file-summary {
-  color: #66786c;
-}
-
-.validation-message {
-  color: #a13f32;
-}
-
-.submit-button {
-  width: 100%;
-  min-height: 2.75rem;
-  margin-top: 1rem;
-  padding: 0.7rem 0.9rem;
-  border: 0;
-  border-radius: 4px;
-  background: #90b2de;
-  color: #fff;
-  font: 600 0.88rem/1.2 Arial, sans-serif;
-  cursor: pointer;
-  transition: background-color 150ms ease;
-}
-
 .message {
   margin: 0 0 1rem;
   padding: 0.75rem 1rem;
@@ -265,14 +177,6 @@ button:focus-visible {
 @media (max-width: 760px) {
   .dashboard {
     padding: 2.25rem 1rem 3rem;
-  }
-
-  .dashboard__layout {
-    grid-template-columns: 1fr;
-  }
-
-  .upload-panel {
-    grid-row: 1;
   }
 }
 

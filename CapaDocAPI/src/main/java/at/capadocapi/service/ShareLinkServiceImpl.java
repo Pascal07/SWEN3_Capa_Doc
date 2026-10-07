@@ -61,6 +61,22 @@ public class ShareLinkServiceImpl implements ShareLinkService {
     @Override
     @Transactional(readOnly = true)
     public List<DocumentResponseDTO> resolveLink(String shortCode, String password) {
+        ShareLinkEntity link = getValidLink(shortCode, password);
+        return link.getDocuments().stream()
+                .map(documentMapper::toResponseDto)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentEntity getDocumentForDownload(String shortCode, String password) {
+        ShareLinkEntity link = getValidLink(shortCode, password);
+        return link.getDocuments().stream()
+                .findFirst()
+                .orElseThrow(() -> new ShareLinkNotFoundException(shortCode));
+    }
+
+    private ShareLinkEntity getValidLink(String shortCode, String password) {
         ShareLinkEntity link = shareLinkRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new ShareLinkNotFoundException(shortCode));
 
@@ -71,10 +87,7 @@ public class ShareLinkServiceImpl implements ShareLinkService {
         if (!passwordEncoder.matches(password, link.getPasswordHash())) {
             throw new InvalidShareLinkPasswordException();
         }
-
-        return link.getDocuments().stream()
-                .map(documentMapper::toResponseDto)
-                .toList();
+        return link;
     }
 
     // DELETE /links/{id}

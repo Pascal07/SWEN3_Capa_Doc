@@ -6,14 +6,8 @@ export interface DocumentRecord {
   uploadedAt: string;
 }
 
-export interface DocumentCreateRequest {
-  filename: string;
-  contentType: string;
-  sizeBytes: number;
-}
-
 export abstract class DocumentsApi {
   abstract list(): Promise<DocumentRecord[]>;
-  abstract create(request: DocumentCreateRequest): Promise<DocumentRecord>;
+  abstract upload(file: Blob, filename: string): Promise<DocumentRecord>;
   abstract delete(id: number): Promise<void>;
 }

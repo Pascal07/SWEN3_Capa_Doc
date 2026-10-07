@@ -14,6 +14,7 @@ public interface DocumentMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "uploadedAt", ignore = true)
     @Mapping(target = "shareLinks", ignore = true)
+    @Mapping(target = "fileContent", ignore = true)
     @Mapping(target = "ownerSub", ignore = true)
     DocumentEntity toEntity(DocumentRequestDTO dto);
 }

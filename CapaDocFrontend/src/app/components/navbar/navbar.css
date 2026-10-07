@@ -11,12 +11,12 @@
   padding: 0.75rem 2.5rem;
   border-bottom: 1px solid #dfe5e2;
   background: #fff;
-  color: #203b2f;
+  color: #05070b; /*#203b2f*/
   font-family: Arial, sans-serif;
 }
 
 .brand {
-  color: #203b2f;
+  color: #05070b; /*#203b2f*/
   font-size: 1.25rem;
   font-weight: 700;
   text-decoration: none;
@@ -37,7 +37,7 @@
 
 .navbar__link:hover,
 .navbar__link--active {
-  color: #176a4b;
+  color: #3d5476; /*#176a4b*/
 }
 
 .navbar__link--active {

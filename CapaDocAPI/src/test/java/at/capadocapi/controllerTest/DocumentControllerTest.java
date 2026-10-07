@@ -13,7 +13,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -187,6 +189,42 @@ class DocumentControllerTest {
                 .andExpect(jsonPath("$.filename").value("report.pdf"));
 
         verify(documentService, times(1)).createDocument(any(DocumentEntity.class));
+    }
+
+    @Test
+    void uploadDocument_savesPdfBytesAndReturnsDocument() throws Exception {
+        byte[] pdf = "%PDF-1.7".getBytes(StandardCharsets.US_ASCII);
+        MockMultipartFile file = new MockMultipartFile("file", "report.pdf", "application/pdf", pdf);
+        when(documentService.createDocumentWithFile(any(DocumentEntity.class), any(byte[].class)))
+                .thenReturn(sampleEntity);
+
+        mockMvc.perform(multipart("/api/documents/upload")
+                        .file(file)
+                        .with(csrf())
+                        .with(oidcLogin()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.filename").value("report.pdf"))
+                .andExpect(jsonPath("$.contentType").value("application/pdf"));
+
+        ArgumentCaptor<DocumentEntity> documentCaptor = ArgumentCaptor.forClass(DocumentEntity.class);
+        ArgumentCaptor<byte[]> contentCaptor = ArgumentCaptor.forClass(byte[].class);
+        verify(documentService).createDocumentWithFile(documentCaptor.capture(), contentCaptor.capture());
+        assertThat(documentCaptor.getValue().getOwnerSub()).isEqualTo("user");
+        assertThat(contentCaptor.getValue()).containsExactly(pdf);
+    }
+
+    @Test
+    void uploadDocument_rejectsNonPdfContent() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "report.pdf", "application/pdf", "not a PDF".getBytes(StandardCharsets.US_ASCII));
+
+        mockMvc.perform(multipart("/api/documents/upload")
+                        .file(file)
+                        .with(csrf())
+                        .with(oidcLogin()))
+                .andExpect(status().isBadRequest());
+
+        verify(documentService, never()).createDocumentWithFile(any(), any());
     }
 
     @Test

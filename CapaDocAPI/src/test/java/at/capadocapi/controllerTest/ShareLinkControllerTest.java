@@ -3,6 +3,9 @@ package at.capadocapi.controllerTest;
 import at.capadocapi.model.dto.DocumentResponseDTO;
 import at.capadocapi.model.dto.ShareLinkRequestDTO;
 import at.capadocapi.model.dto.ShareLinkResponseDTO;
+import at.capadocapi.model.DocumentContentEntity;
+import at.capadocapi.model.DocumentEntity;
+import at.capadocapi.service.Interfaces.DocumentService;
 import at.capadocapi.service.ShareLinkServiceImpl;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,7 +18,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -24,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import org.springframework.security.test.context.support.WithMockUser;
 
 /**
@@ -47,6 +53,9 @@ class ShareLinkControllerTest {
 
     @MockitoBean
     private ShareLinkServiceImpl shareLinkService;
+
+    @MockitoBean
+    private DocumentService documentService;
 
     private ShareLinkRequestDTO validRequest;
     private ShareLinkResponseDTO sampleResponse;
@@ -173,6 +182,29 @@ class ShareLinkControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(shareLinkService, never()).resolveLink(anyString(), anyString());
+    }
+
+    @Test
+    void downloadSharedDocument_returnsPdfForValidPublicLink() throws Exception {
+        byte[] pdf = "%PDF-1.7".getBytes(StandardCharsets.US_ASCII);
+        DocumentEntity document = new DocumentEntity();
+        document.setId(1L);
+        document.setFilename("report.pdf");
+        DocumentContentEntity fileContent = new DocumentContentEntity();
+        fileContent.setDocumentId(1L);
+        fileContent.setContent(pdf);
+        when(shareLinkService.getDocumentForDownload("abc123", "secret123")).thenReturn(document);
+        when(documentService.getDocumentContent(1L)).thenReturn(Optional.of(fileContent));
+
+        mockMvc.perform(get("/api/links/{shortCode}/download", "abc123")
+                        .param("password", "secret123")
+                        .with(anonymous()))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(content().bytes(pdf))
+                .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("report.pdf")));
+
+        verify(shareLinkService).getDocumentForDownload("abc123", "secret123");
     }
 
     // ---------- DELETE /api/links/{id} ----------
