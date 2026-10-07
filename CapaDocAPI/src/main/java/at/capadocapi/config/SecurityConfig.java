@@ -31,11 +31,7 @@ public class SecurityConfig {
                                     @Value("${app.frontend-url:http://localhost}") String frontendUrl) throws Exception {
         http
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers(HttpMethod.GET,
-                                "/links/{shortCode}",
-                                "/api/links/{shortCode}",
-                                "/links/{shortCode}/download",
-                                "/api/links/{shortCode}/download").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/links/{shortCode}", "/api/links/{shortCode}").permitAll()
                         .requestMatchers("/api/ping", "/ping", "/error").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(o -> o.defaultSuccessUrl(frontendUrl + "/dashboard", true))

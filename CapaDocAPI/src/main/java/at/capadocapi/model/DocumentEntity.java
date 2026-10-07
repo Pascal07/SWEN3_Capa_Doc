@@ -30,11 +30,6 @@ public class DocumentEntity {
     @Column(name = "owner_sub")
     private String ownerSub;
 
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
-    @OneToOne(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private DocumentContentEntity fileContent;
-
     // m:n relation to ShareLink – owning side lives here
     @Builder.Default
     @ToString.Exclude

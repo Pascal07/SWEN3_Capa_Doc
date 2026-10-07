@@ -19,7 +19,8 @@
 			<p class="message message--success" role="status">{{ successMessage }}</p>
 		}
 
-		<section class="documents-panel" aria-labelledby="documents-heading">
+		<div class="dashboard__layout">
+			<section class="documents-panel" aria-labelledby="documents-heading">
 				<div class="panel-heading">
 					<div>
 						<h2 id="documents-heading">Dokumente</h2>
@@ -36,7 +37,7 @@
 					<div class="list-state empty-state">
 						<span class="empty-state__mark" aria-hidden="true">PDF</span>
 						<h3>Noch keine Dokumente</h3>
-						<p>Öffne „Upload document“, um dein erstes PDF hinzuzufügen.</p>
+						<p>Füge rechts dein erstes PDF hinzu.</p>
 					</div>
 				} @else {
 					<ul class="document-list">
@@ -60,6 +61,42 @@
 						}
 					</ul>
 				}
-		</section>
+			</section>
+
+			<aside class="upload-panel" aria-labelledby="upload-heading">
+				<p class="upload-panel__eyebrow">NEU</p>
+				<h2 id="upload-heading">PDF hinzufügen</h2>
+				<p class="upload-panel__copy">Wähle ein Dokument von deinem Gerät aus.</p>
+
+				<form (ngSubmit)="createDocument(fileInput)">
+					<label class="file-field" for="document-file">
+						<span class="file-field__icon" aria-hidden="true">+</span>
+						<span class="file-field__label">PDF-Datei auswählen</span>
+						<span class="file-field__name">{{ selectedFile?.name ?? 'Keine Datei ausgewählt' }}</span>
+						<input
+							#fileInput
+							id="document-file"
+							name="document"
+							type="file"
+							accept=".pdf,application/pdf"
+							required
+							(change)="onFileSelected($event)"
+							[disabled]="isSubmitting">
+					</label>
+
+					@if (validationMessage) {
+						<p class="validation-message" role="alert">{{ validationMessage }}</p>
+					}
+
+					@if (selectedFile) {
+						<p class="file-summary">{{ formatSize(selectedFile.size) }} · PDF</p>
+					}
+
+					<button class="submit-button" type="submit" [disabled]="!selectedFile || isSubmitting">
+						{{ isSubmitting ? 'Wird hinzugefügt ...' : 'Dokument hinzufügen' }}
+					</button>
+				</form>
+			</aside>
+		</div>
 	</div>
 </main>

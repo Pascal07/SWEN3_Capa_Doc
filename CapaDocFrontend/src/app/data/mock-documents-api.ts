@@ -1,4 +1,4 @@
-import { DocumentRecord, DocumentsApi } from './documents-api';
+import { DocumentCreateRequest, DocumentRecord, DocumentsApi } from './documents-api';
 
 export class MockDocumentsApi extends DocumentsApi {
   private documents: DocumentRecord[] = [
@@ -29,11 +29,9 @@ export class MockDocumentsApi extends DocumentsApi {
     return this.documents.map((document) => ({ ...document }));
   }
 
-  async upload(file: Blob, filename: string): Promise<DocumentRecord> {
+  async create(request: DocumentCreateRequest): Promise<DocumentRecord> {
     const document: DocumentRecord = {
-      filename,
-      contentType: file.type || 'application/pdf',
-      sizeBytes: file.size,
+      ...request,
       id: Math.max(0, ...this.documents.map((item) => item.id)) + 1,
       uploadedAt: new Date().toISOString(),
     };

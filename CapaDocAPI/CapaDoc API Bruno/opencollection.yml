@@ -31,7 +31,7 @@ docs:
 
     ## 📌 Zweck
 
-    Die Collection enthält automatisierte Requests und Tests für die REST-API und den passwortgeschützten Dokumentenaustausch.
+    Die Collection enthält automatisierte Requests und Tests für die Endpoints aus **Sprint 1 (REST API, DAL)**.
 
     ### Documents
 
@@ -40,9 +40,6 @@ docs:
     ```text
     /documents
     ```
-
-    PDF-Dateien werden über `POST /documents/upload` als Multipart-Datei gespeichert.
-    Der Upload ist auf 25 MB begrenzt und akzeptiert nur PDF-Dateien.
 
     Getestete Operationen:
 
@@ -59,12 +56,7 @@ docs:
     ```text
     /documents/{id}/links
     /links/{shortCode}
-    /links/{shortCode}/download
     ```
-
-    Der Download-Endpunkt liefert die PDF-Datei nur mit dem korrekten Passwort und
-    solange der Link gültig ist. Der Empfänger kann die Datei anschließend als
-    eigenes Dokument hochladen.
 
     ---
 

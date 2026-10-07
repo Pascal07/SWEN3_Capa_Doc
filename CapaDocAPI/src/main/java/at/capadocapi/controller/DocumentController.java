@@ -8,14 +8,11 @@ import at.capadocapi.service.Interfaces.DocumentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
@@ -67,32 +64,6 @@ public class DocumentController {
         return new ResponseEntity<>(documentMapper.toResponseDto(created), HttpStatus.CREATED);
     }
 
-    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<DocumentResponseDTO> uploadDocument(
-            @RequestPart("file") MultipartFile file,
-            @AuthenticationPrincipal OidcUser user) throws IOException {
-        String originalFilename = file.getOriginalFilename();
-        String filename = originalFilename == null ? "" : originalFilename.replace('\\', '/');
-        filename = filename.substring(filename.lastIndexOf('/') + 1);
-        byte[] fileContent = file.getBytes();
-        if (file.isEmpty()
-                || !filename.toLowerCase().endsWith(".pdf")
-                || !hasPdfSignature(fileContent)) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        DocumentEntity document = new DocumentEntity();
-        document.setFilename(filename);
-        document.setContentType(MediaType.APPLICATION_PDF_VALUE);
-        document.setSizeBytes(file.getSize());
-        if (user != null) {
-            document.setOwnerSub(user.getSubject());
-        }
-
-        DocumentEntity created = documentService.createDocumentWithFile(document, fileContent);
-        return new ResponseEntity<>(documentMapper.toResponseDto(created), HttpStatus.CREATED);
-    }
-
     @PutMapping("/{id}")
     public ResponseEntity<DocumentResponseDTO> updateDocument(
             @PathVariable Long id,
@@ -136,14 +107,5 @@ public class DocumentController {
             return false;
         }
         return doc.getOwnerSub() != null && !doc.getOwnerSub().equals(user.getSubject());
-    }
-
-    private boolean hasPdfSignature(byte[] content) {
-        return content.length >= 5
-                && content[0] == '%'
-                && content[1] == 'P'
-                && content[2] == 'D'
-                && content[3] == 'F'
-                && content[4] == '-';
     }
 }
