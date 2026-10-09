@@ -6,6 +6,6 @@ import { Navbar } from '../../components/navbar/navbar';
   standalone: true,
   imports: [Navbar],
   templateUrl: './share-page.html',
-  styles: [':host { display: flex; min-height: 100svh; flex-direction: column; background: #fff; } .page-canvas { flex: 1; background: #fff; }'],
+  styleUrl: './share-page.css',
 })
 export class SharePage {}
