@@ -55,7 +55,7 @@
 								<span class="file-mark" aria-hidden="true">{{ document.filename.split('.').pop()?.toUpperCase() }}</span>
 								<div class="document-row__details">
 									<h3>
-										<button class="document-name-button" type="button" (click)="openRenameDialog(document)">
+										<button class="document-name-button" type="button" (click)="openDocumentDetails(document)">
 											{{ document.filename }}
 										</button>
 									</h3>
@@ -88,37 +88,109 @@
 			aria-modal="true"
 			aria-labelledby="rename-heading"
 			(keydown.escape)="cancelRename()">
-			<h2 id="rename-heading">Dokument umbenennen</h2>
-			<p class="rename-dialog__description">Gib einen neuen Namen für „{{ document.filename }}“ ein.</p>
-			@if (errorMessage(); as error) {
-				<p class="message message--error" role="alert">{{ error }}</p>
+			<h2 id="rename-heading">Dokumentdetails</h2>
+			<p class="rename-dialog__description">{{ document.filename }}</p>
+			@if (isLoadingDetails()) {
+				<p class="list-state" role="status">Dokumentdetails werden geladen ...</p>
 			}
 
-			<form (ngSubmit)="saveFilename()">
-				<label class="rename-dialog__label" for="document-filename">Dateiname</label>
-				<div class="rename-dialog__filename">
-					<input
-						class="rename-dialog__input"
-						id="document-filename"
-						name="filename"
-						type="text"
-						[(ngModel)]="editedFilename"
-						[disabled]="isUpdating()"
-						required
-						autofocus>
-					@if (filenameExtension(); as extension) {
-						<span class="rename-dialog__extension" aria-label="Dateiendung, kann nicht geändert werden">{{ extension }}</span>
+			@if (detailError(); as error) {
+				<p class="message message--error" role="alert">{{ error }}</p>
+			}
+			@if (detailMessage(); as message) {
+				<p class="message message--success" role="status">{{ message }}</p>
+			}
+
+			@if (!isLoadingDetails()) {
+				<dl class="document-metadata">
+					<div><dt>Typ</dt><dd>{{ document.contentType }}</dd></div>
+					<div><dt>Größe</dt><dd>{{ formatSize(document.sizeBytes) }}</dd></div>
+					<div><dt>Hochgeladen</dt><dd>{{ document.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</dd></div>
+				</dl>
+
+				<form (ngSubmit)="saveFilename()">
+					<label class="rename-dialog__label" for="document-filename">Dateiname</label>
+					<div class="rename-dialog__filename">
+						<input
+							class="rename-dialog__input"
+							id="document-filename"
+							name="filename"
+							type="text"
+							[(ngModel)]="editedFilename"
+							[disabled]="isUpdating()"
+							required
+							autofocus>
+						@if (filenameExtension(); as extension) {
+							<span class="rename-dialog__extension" aria-label="Dateiendung, kann nicht geändert werden">{{ extension }}</span>
+						}
+					</div>
+					<div class="rename-dialog__actions">
+						<button class="rename-dialog__save" type="submit" [disabled]="!editedFilename.trim() || isUpdating()">
+							{{ isUpdating() ? 'Wird gespeichert ...' : 'Namen speichern' }}
+						</button>
+					</div>
+				</form>
+
+				<section class="share-link-section" aria-labelledby="share-links-heading">
+					<h3 id="share-links-heading">Share-Links</h3>
+					<p class="share-link-notice">Die API bietet derzeit keine Liste bereits vorhandener Links. Hier erscheinen Links, die du in dieser Sitzung erstellst.</p>
+
+					<form class="share-link-form" (ngSubmit)="createShareLink()">
+						<div class="rename-dialog__field">
+							<label class="rename-dialog__label" for="share-link-password">Passwort</label>
+							<input
+								class="rename-dialog__input rename-dialog__input--standalone"
+								id="share-link-password"
+								name="sharePassword"
+								type="password"
+								[(ngModel)]="sharePassword"
+								[disabled]="isCreatingShareLink()"
+								required>
+						</div>
+						<div class="rename-dialog__field">
+							<label class="rename-dialog__label" for="share-link-expiry">Ablaufdatum</label>
+							<input
+								class="rename-dialog__input rename-dialog__input--standalone"
+								id="share-link-expiry"
+								name="shareExpiryDate"
+								type="datetime-local"
+								[(ngModel)]="shareExpiryDate"
+								[disabled]="isCreatingShareLink()"
+								required>
+						</div>
+						<button class="rename-dialog__save" type="submit" [disabled]="!sharePassword.trim() || !shareExpiryDate || isCreatingShareLink()">
+							{{ isCreatingShareLink() ? 'Wird erstellt ...' : 'Link erstellen' }}
+						</button>
+					</form>
+
+					@if (shareLinks().length > 0) {
+						<ul class="share-link-list">
+							@for (link of shareLinks(); track link.id) {
+								<li>
+									<div>
+										<a [href]="shareLinkUrl(link)" target="_blank" rel="noopener noreferrer">{{ shareLinkUrl(link) }}</a>
+										<p>Gültig bis {{ link.expiryDate | date:'dd.MM.yyyy, HH:mm' }}</p>
+									</div>
+									<button type="button" (click)="copyShareLink(link)">Kopieren</button>
+									<button
+										class="delete-button"
+										type="button"
+										(click)="deleteShareLink(link)"
+										[disabled]="deletingShareLinkId() === link.id">
+										{{ deletingShareLinkId() === link.id ? 'Lösche ...' : 'Löschen' }}
+									</button>
+								</li>
+							}
+						</ul>
 					}
-				</div>
-				<div class="rename-dialog__actions">
-					<button class="rename-dialog__back" type="button" (click)="cancelRename()" [disabled]="isUpdating()">
-						Zurück
-					</button>
-					<button class="rename-dialog__save" type="submit" [disabled]="!editedFilename.trim() || isUpdating()">
-						{{ isUpdating() ? 'Wird gespeichert ...' : 'Speichern' }}
-					</button>
-				</div>
-			</form>
+				</section>
+			}
+
+			<div class="rename-dialog__actions">
+				<button class="rename-dialog__back" type="button" (click)="cancelRename()">
+					Zurück
+				</button>
+			</div>
 		</section>
 	</div>
 }

@@ -17,16 +17,53 @@
         </div>
       </div>
 
-      <div class="share-fields">
-        <div class="share-field">
-          <label for="share-code">Code</label>
-          <input id="share-code" name="code" type="text" autocomplete="off" placeholder="Dokument-Code">
+      @if (errorMessage(); as error) {
+        <p class="message message--error" role="alert">{{ error }}</p>
+      }
+
+      <form class="share-form" (ngSubmit)="openSharedDocument()">
+        <div class="share-fields">
+          <div class="share-field">
+            <label for="share-code">Code</label>
+            <input
+              id="share-code"
+              name="code"
+              type="text"
+              autocomplete="off"
+              placeholder="Dokument-Code"
+              [ngModel]="shortCode()"
+              (ngModelChange)="shortCode.set($event)"
+              required>
+          </div>
+          <div class="share-field">
+            <label for="share-password">Passwort</label>
+            <input
+              id="share-password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Passwort"
+              [ngModel]="password()"
+              (ngModelChange)="password.set($event)"
+              required>
+          </div>
         </div>
-        <div class="share-field">
-          <label for="share-password">Passwort</label>
-          <input id="share-password" name="password" type="password" autocomplete="off" placeholder="Passwort">
-        </div>
-      </div>
+        <button class="share-submit" type="submit" [disabled]="!shortCode().trim() || !password() || isSubmitting()">
+          {{ isSubmitting() ? 'Wird geprüft ...' : 'Dokument öffnen' }}
+        </button>
+      </form>
+
+      @if (document(); as sharedDocument) {
+        <section class="shared-document" aria-labelledby="shared-document-heading">
+          <h2 id="shared-document-heading">{{ sharedDocument.filename }}</h2>
+          <dl>
+            <div><dt>Dateityp</dt><dd>{{ sharedDocument.contentType }}</dd></div>
+            <div><dt>Größe</dt><dd>{{ sharedDocument.sizeBytes.toLocaleString('de-DE') }} Bytes</dd></div>
+            <div><dt>Hochgeladen</dt><dd>{{ sharedDocument.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</dd></div>
+          </dl>
+          <p class="download-notice">Der Server stellt aktuell nur Dokument-Metadaten bereit. Ein Datei-Download ist über die vorhandene API noch nicht verfügbar.</p>
+        </section>
+      }
     </section>
   </div>
 </main>

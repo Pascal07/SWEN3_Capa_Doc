@@ -14,6 +14,12 @@ export class HttpDocumentsApi extends DocumentsApi {
     );
   }
 
+  get(id: number): Promise<DocumentRecord> {
+    return firstValueFrom(
+      this.http.get<DocumentRecord>(`${this.endpoint}/${id}`).pipe(timeout(15_000)),
+    );
+  }
+
   create(request: DocumentCreateRequest): Promise<DocumentRecord> {
     return firstValueFrom(
       this.http.post<DocumentRecord>(this.endpoint, request).pipe(timeout(15_000)),

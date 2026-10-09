@@ -7,6 +7,7 @@ import { signal } from '@angular/core';
 import { TimeoutError } from 'rxjs';
 import { Navbar } from '../../components/navbar/navbar';
 import { DocumentCreateRequest, DocumentRecord, DocumentsApi } from '../../data/documents-api';
+import { ShareLinkRecord, ShareLinksApi } from '../../data/share-links-api';
 import { AuthService } from '../../services/auth/auth';
 
 @Component({
@@ -18,6 +19,7 @@ import { AuthService } from '../../services/auth/auth';
 })
 export class Dashboard implements OnInit {
   private readonly documentsApi = inject(DocumentsApi);
+  private readonly shareLinksApi = inject(ShareLinksApi);
   readonly auth = inject(AuthService);
 
   readonly documents = signal<DocumentRecord[]>([]);
@@ -25,10 +27,18 @@ export class Dashboard implements OnInit {
   readonly deletingId = signal<number | null>(null);
   readonly editingDocument = signal<DocumentRecord | null>(null);
   readonly isUpdating = signal(false);
+  readonly isLoadingDetails = signal(false);
+  readonly isCreatingShareLink = signal(false);
+  readonly deletingShareLinkId = signal<number | null>(null);
+  readonly shareLinks = signal<ShareLinkRecord[]>([]);
+  readonly detailMessage = signal('');
+  readonly detailError = signal('');
   readonly errorMessage = signal('');
   readonly successMessage = signal('');
   editedFilename = '';
   readonly filenameExtension = signal('');
+  sharePassword = '';
+  shareExpiryDate = this.getDefaultExpiryDate();
 
   ngOnInit(): void {
     void this.loadDocuments();
@@ -71,23 +81,45 @@ export class Dashboard implements OnInit {
     }
   }
 
-  openRenameDialog(document: DocumentRecord): void {
-    this.errorMessage.set('');
+  async openDocumentDetails(document: DocumentRecord): Promise<void> {
     this.successMessage.set('');
+    this.errorMessage.set('');
+    this.detailError.set('');
+    this.detailMessage.set('');
+    this.editingDocument.set(document);
     const extensionStart = document.filename.lastIndexOf('.');
     const hasExtension = extensionStart > 0;
     this.editedFilename = hasExtension
       ? document.filename.slice(0, extensionStart)
       : document.filename;
     this.filenameExtension.set(hasExtension ? document.filename.slice(extensionStart) : '');
-    this.editingDocument.set(document);
+    this.shareLinks.set(this.shareLinksApi.createdForDocument(document.id));
+    this.sharePassword = '';
+    this.shareExpiryDate = this.getDefaultExpiryDate();
+    this.isLoadingDetails.set(true);
+
+    try {
+      const details = await this.documentsApi.get(document.id);
+      this.editingDocument.set(details);
+      this.editedFilename = this.filenameWithoutExtension(details.filename);
+      this.filenameExtension.set(this.extensionOf(details.filename));
+    } catch (error) {
+      this.detailError.set(this.getRequestErrorMessage(
+        error,
+        'Dokumentdetails konnten nicht geladen werden.',
+      ));
+    } finally {
+      this.isLoadingDetails.set(false);
+    }
   }
 
   cancelRename(): void {
-    if (this.isUpdating()) return;
+    if (this.isUpdating() || this.isCreatingShareLink() || this.deletingShareLinkId() !== null) return;
     this.editingDocument.set(null);
     this.editedFilename = '';
     this.filenameExtension.set('');
+    this.detailError.set('');
+    this.detailMessage.set('');
   }
 
   async saveFilename(): Promise<void> {
@@ -116,18 +148,94 @@ export class Dashboard implements OnInit {
       this.documents.update((items) =>
         items.map((item) => item.id === updatedDocument.id ? updatedDocument : item),
       );
-      this.successMessage.set('Dokumentname wurde geändert.');
-      this.editingDocument.set(null);
-      this.editedFilename = '';
-      this.filenameExtension.set('');
+      this.editingDocument.set(updatedDocument);
+      this.detailMessage.set('Dokumentname wurde geändert.');
     } catch (error) {
-      this.errorMessage.set(this.getRequestErrorMessage(
+      this.detailError.set(this.getRequestErrorMessage(
         error,
         'Dokumentname konnte nicht geändert werden. Bitte versuche es erneut.',
       ));
     } finally {
       this.isUpdating.set(false);
     }
+  }
+
+  async createShareLink(): Promise<void> {
+    const document = this.editingDocument();
+    const password = this.sharePassword.trim();
+    if (!document || !password || !this.shareExpiryDate) {
+      this.detailError.set('Bitte gib ein Passwort und ein Ablaufdatum an.');
+      return;
+    }
+    if (new Date(this.shareExpiryDate).getTime() <= Date.now()) {
+      this.detailError.set('Das Ablaufdatum muss in der Zukunft liegen.');
+      return;
+    }
+
+    this.detailError.set('');
+    this.detailMessage.set('');
+    this.isCreatingShareLink.set(true);
+
+    try {
+      const link = await this.shareLinksApi.create(document.id, {
+        password,
+        expiryDate: this.shareExpiryDate,
+      });
+      this.shareLinks.set([link, ...this.shareLinks()]);
+      this.sharePassword = '';
+      this.detailMessage.set('Share-Link wurde erstellt.');
+    } catch (error) {
+      this.detailError.set(this.getRequestErrorMessage(error, 'Share-Link konnte nicht erstellt werden.'));
+    } finally {
+      this.isCreatingShareLink.set(false);
+    }
+  }
+
+  async deleteShareLink(link: ShareLinkRecord): Promise<void> {
+    this.detailError.set('');
+    this.detailMessage.set('');
+    this.deletingShareLinkId.set(link.id);
+
+    try {
+      await this.shareLinksApi.delete(link.id);
+      const links = this.shareLinks().filter((item) => item.id !== link.id);
+      this.shareLinks.set(links);
+      this.detailMessage.set('Share-Link wurde gelöscht.');
+    } catch (error) {
+      this.detailError.set(this.getRequestErrorMessage(error, 'Share-Link konnte nicht gelöscht werden.'));
+    } finally {
+      this.deletingShareLinkId.set(null);
+    }
+  }
+
+  shareLinkUrl(link: ShareLinkRecord): string {
+    return `${window.location.origin}/share/${encodeURIComponent(link.shortCode)}`;
+  }
+
+  async copyShareLink(link: ShareLinkRecord): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.shareLinkUrl(link));
+      this.detailMessage.set('Share-Link wurde kopiert.');
+      this.detailError.set('');
+    } catch (error) {
+      this.detailError.set('Der Share-Link konnte nicht in die Zwischenablage kopiert werden.');
+    }
+  }
+
+  private getDefaultExpiryDate(): string {
+    const date = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const pad = (value: number) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  private filenameWithoutExtension(filename: string): string {
+    const extensionStart = filename.lastIndexOf('.');
+    return extensionStart > 0 ? filename.slice(0, extensionStart) : filename;
+  }
+
+  private extensionOf(filename: string): string {
+    const extensionStart = filename.lastIndexOf('.');
+    return extensionStart > 0 ? filename.slice(extensionStart) : '';
   }
 
   formatSize(sizeBytes: number): string {

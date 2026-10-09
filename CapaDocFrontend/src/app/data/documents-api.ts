@@ -14,6 +14,7 @@ export interface DocumentCreateRequest {
 
 export abstract class DocumentsApi {
   abstract list(): Promise<DocumentRecord[]>;
+  abstract get(id: number): Promise<DocumentRecord>;
   abstract create(request: DocumentCreateRequest): Promise<DocumentRecord>;
   abstract update(id: number, request: DocumentCreateRequest): Promise<DocumentRecord>;
   abstract delete(id: number): Promise<void>;

@@ -24,6 +24,21 @@ export class UploadPage {
   readonly validationMessage = signal('');
   readonly successMessage = signal('');
 
+  private readonly contentTypesByExtension: Record<string, string> = {
+    csv: 'text/csv',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    jpeg: 'image/jpeg',
+    jpg: 'image/jpeg',
+    pdf: 'application/pdf',
+    png: 'image/png',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    txt: 'text/plain',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  };
+
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0] ?? null;
@@ -36,6 +51,18 @@ export class UploadPage {
 
     if (file.size <= 0) {
       this.validationMessage.set('Die Datei darf nicht leer sein.');
+      input.value = '';
+      return;
+    }
+
+    const expectedContentType = this.contentTypesByExtension[this.fileExtension(file.name)];
+    if (!expectedContentType) {
+      this.validationMessage.set('Dieser Dateityp wird nicht unterstützt.');
+      input.value = '';
+      return;
+    }
+    if (file.type && file.type !== 'application/octet-stream' && file.type !== expectedContentType) {
+      this.validationMessage.set('Der Dateityp passt nicht zur Dateiendung.');
       input.value = '';
       return;
     }
@@ -92,24 +119,10 @@ export class UploadPage {
   }
 
   getContentType(file: File): string {
-    if (file.type && file.type !== 'application/octet-stream') return file.type;
+    return this.contentTypesByExtension[this.fileExtension(file.name)] ?? file.type;
+  }
 
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    const contentTypes: Record<string, string> = {
-      csv: 'text/csv',
-      doc: 'application/msword',
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      jpeg: 'image/jpeg',
-      jpg: 'image/jpeg',
-      pdf: 'application/pdf',
-      png: 'image/png',
-      ppt: 'application/vnd.ms-powerpoint',
-      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      txt: 'text/plain',
-      xls: 'application/vnd.ms-excel',
-      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    };
-
-    return contentTypes[extension ?? ''] ?? (file.type || 'application/octet-stream');
+  private fileExtension(filename: string): string {
+    return filename.split('.').pop()?.toLowerCase() ?? '';
   }
 }

@@ -38,6 +38,7 @@
             id="document-file"
             name="document"
             type="file"
+            accept=".csv,.doc,.docx,.jpeg,.jpg,.pdf,.png,.ppt,.pptx,.txt,.xls,.xlsx"
             required
             (change)="onFileSelected($event)"
             [disabled]="isSubmitting()">
