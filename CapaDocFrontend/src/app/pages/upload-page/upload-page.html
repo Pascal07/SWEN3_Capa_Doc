@@ -1,2 +1,63 @@
 <app-navbar />
-<main class="page-canvas"></main>
+<main class="upload-page">
+  <div class="upload-page__inner">
+    <header class="upload-page__intro">
+      <div>
+        <p class="upload-page__eyebrow">DOKUMENTENBIBLIOTHEK</p>
+        <h1>Dokument hochladen</h1>
+        <p class="upload-page__subtitle">Füge eine Datei zu deinen Dokumenten hinzu.</p>
+      </div>
+    </header>
+
+    @if (errorMessage(); as error) {
+      <p class="message message--error" role="alert">{{ error }}
+        @if (!auth.isLoggedIn()) {
+          <a class="dashboard-link" routerLink="/">Jetzt anmelden</a>
+        }
+      </p>
+    }
+    @if (successMessage(); as success) {
+      <p class="message message--success" role="status">{{ success }}</p>
+    }
+
+    <section class="upload-panel" aria-labelledby="upload-heading">
+      <div class="panel-heading">
+        <div>
+          <h2 id="upload-heading">Datei hinzufügen</h2>
+          <p>Wähle ein Dokument von deinem Gerät aus.</p>
+        </div>
+      </div>
+
+      <form (ngSubmit)="createDocument(fileInput)">
+        <label class="file-field" for="document-file">
+          <span class="file-field__icon" aria-hidden="true">+</span>
+          <span class="file-field__label">Datei auswählen</span>
+          <span class="file-field__name">{{ selectedFile()?.name ?? 'Keine Datei ausgewählt' }}</span>
+          <input
+            #fileInput
+            id="document-file"
+            name="document"
+            type="file"
+            required
+            (change)="onFileSelected($event)"
+            [disabled]="isSubmitting()">
+        </label>
+
+        @if (validationMessage(); as validation) {
+          <p class="validation-message" role="alert">{{ validation }}</p>
+        }
+
+        @if (selectedFile(); as file) {
+          <p class="file-summary">{{ formatSize(file.size) }} · {{ getContentType(file) }}</p>
+        }
+
+        <button class="submit-button" type="submit" [disabled]="!selectedFile() || isSubmitting()">
+          {{ isSubmitting() ? 'Wird hinzugefügt ...' : 'Dokument hinzufügen' }}
+        </button>
+      </form>
+      @if (successMessage()) {
+        <a class="dashboard-link" routerLink="/dashboard">Zum Dashboard</a>
+      }
+    </section>
+  </div>
+</main>

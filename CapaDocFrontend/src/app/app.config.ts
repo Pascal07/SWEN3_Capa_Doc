@@ -9,6 +9,8 @@ import { provideClientHydration, withEventReplay } from '@angular/platform-brows
 import { provideHttpClient, withFetch } from '@angular/common/http';
 
 import { routes } from './app.routes';
+import { DocumentsApi } from './data/documents-api';
+import { HttpDocumentsApi } from './data/http-documents-api';
 import { AuthService } from './services/auth/auth';
 
 export const appConfig: ApplicationConfig = {
@@ -17,6 +19,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideClientHydration(withEventReplay()),
     provideHttpClient(withFetch()),
+    { provide: DocumentsApi, useExisting: HttpDocumentsApi },
     provideAppInitializer(() => inject(AuthService).loadUser()),
   ],
 };

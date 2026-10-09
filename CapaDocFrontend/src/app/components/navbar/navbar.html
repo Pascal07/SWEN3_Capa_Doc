@@ -6,7 +6,11 @@
     <a class="navbar__link" routerLink="/share" routerLinkActive="navbar__link--active" ariaCurrentWhenActive="page">Share document</a>
   </nav>
   <div class="account">
-    <span class="username">{{ auth.user()?.name || auth.user()?.email }}</span>
-    <button class="navbar__link" (click)="auth.logout()" ariaCurrentWhenActive="page">Logout</button>
+    @if (auth.user(); as user) {
+      <span class="username">{{ user.name || user.email }}</span>
+      <button class="navbar__link" (click)="auth.logout()">Logout</button>
+    } @else {
+      <a class="navbar__link" routerLink="/">Anmelden</a>
+    }
   </div>
 </header>
