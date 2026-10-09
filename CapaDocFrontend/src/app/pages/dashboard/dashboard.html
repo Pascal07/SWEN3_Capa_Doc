@@ -13,11 +13,13 @@
 		</header>
 
 		@if (errorMessage(); as error) {
-			<p class="message message--error" role="alert">{{ error }}
-				@if (!auth.isLoggedIn()) {
-					<a class="upload-link" routerLink="/">Jetzt anmelden</a>
-				}
-			</p>
+			@if (!editingDocument()) {
+				<p class="message message--error" role="alert">{{ error }}
+					@if (!auth.isLoggedIn()) {
+						<a class="upload-link" routerLink="/">Jetzt anmelden</a>
+					}
+				</p>
+			}
 		}
 		@if (successMessage(); as success) {
 			<p class="message message--success" role="status">{{ success }}</p>
@@ -52,7 +54,11 @@
 							<li class="document-row">
 								<span class="file-mark" aria-hidden="true">{{ document.filename.split('.').pop()?.toUpperCase() }}</span>
 								<div class="document-row__details">
-									<h3>{{ document.filename }}</h3>
+									<h3>
+										<button class="document-name-button" type="button" (click)="openRenameDialog(document)">
+											{{ document.filename }}
+										</button>
+									</h3>
 									<p>{{ document.contentType }} · {{ document.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</p>
 								</div>
 								<span class="document-row__size">{{ formatSize(document.sizeBytes) }}</span>
@@ -73,3 +79,46 @@
 		</div>
 	</div>
 </main>
+
+@if (editingDocument(); as document) {
+	<div class="dialog-backdrop">
+		<section
+			class="rename-dialog"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="rename-heading"
+			(keydown.escape)="cancelRename()">
+			<h2 id="rename-heading">Dokument umbenennen</h2>
+			<p class="rename-dialog__description">Gib einen neuen Namen für „{{ document.filename }}“ ein.</p>
+			@if (errorMessage(); as error) {
+				<p class="message message--error" role="alert">{{ error }}</p>
+			}
+
+			<form (ngSubmit)="saveFilename()">
+				<label class="rename-dialog__label" for="document-filename">Dateiname</label>
+				<div class="rename-dialog__filename">
+					<input
+						class="rename-dialog__input"
+						id="document-filename"
+						name="filename"
+						type="text"
+						[(ngModel)]="editedFilename"
+						[disabled]="isUpdating()"
+						required
+						autofocus>
+					@if (filenameExtension(); as extension) {
+						<span class="rename-dialog__extension" aria-label="Dateiendung, kann nicht geändert werden">{{ extension }}</span>
+					}
+				</div>
+				<div class="rename-dialog__actions">
+					<button class="rename-dialog__back" type="button" (click)="cancelRename()" [disabled]="isUpdating()">
+						Zurück
+					</button>
+					<button class="rename-dialog__save" type="submit" [disabled]="!editedFilename.trim() || isUpdating()">
+						{{ isUpdating() ? 'Wird gespeichert ...' : 'Speichern' }}
+					</button>
+				</div>
+			</form>
+		</section>
+	</div>
+}

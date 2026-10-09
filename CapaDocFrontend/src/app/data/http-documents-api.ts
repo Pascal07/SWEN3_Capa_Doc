@@ -20,6 +20,12 @@ export class HttpDocumentsApi extends DocumentsApi {
     );
   }
 
+  update(id: number, request: DocumentCreateRequest): Promise<DocumentRecord> {
+    return firstValueFrom(
+      this.http.put<DocumentRecord>(`${this.endpoint}/${id}`, request).pipe(timeout(15_000)),
+    );
+  }
+
   async delete(id: number): Promise<void> {
     await firstValueFrom(
       this.http.delete<void>(`${this.endpoint}/${id}`).pipe(timeout(15_000)),
