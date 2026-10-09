@@ -45,7 +45,7 @@
 
 .dashboard__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 1.25rem;
 }
@@ -98,6 +98,9 @@
 }
 
 .document-list {
+  max-height: min(50svh, 32rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   margin: 0;
   padding: 0;
   list-style: none;

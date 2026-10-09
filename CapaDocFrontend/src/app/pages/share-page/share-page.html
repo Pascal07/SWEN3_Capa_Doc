@@ -58,7 +58,7 @@
           <h2 id="shared-document-heading">{{ sharedDocument.filename }}</h2>
           <dl>
             <div><dt>Dateityp</dt><dd>{{ sharedDocument.contentType }}</dd></div>
-            <div><dt>Größe</dt><dd>{{ sharedDocument.sizeBytes.toLocaleString('de-DE') }} Bytes</dd></div>
+            <div><dt>Größe</dt><dd>{{ formatSize(sharedDocument.sizeBytes) }}</dd></div>
             <div><dt>Hochgeladen</dt><dd>{{ sharedDocument.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</dd></div>
           </dl>
           <p class="download-notice">Der Server stellt aktuell nur Dokument-Metadaten bereit. Ein Datei-Download ist über die vorhandene API noch nicht verfügbar.</p>

@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TimeoutError } from 'rxjs';
 import { Navbar } from '../../components/navbar/navbar';
-import { DocumentCreateRequest, DocumentsApi } from '../../data/documents-api';
+import { DocumentCreateRequest, DocumentsApi, formatFileSize } from '../../data/documents-api';
 import { AuthService } from '../../services/auth/auth';
 
 @Component({
@@ -114,8 +114,7 @@ export class UploadPage {
   }
 
   formatSize(sizeBytes: number): string {
-    if (sizeBytes < 1_000_000) return `${Math.max(1, Math.round(sizeBytes / 1_000))} KB`;
-    return `${(sizeBytes / 1_000_000).toFixed(1)} MB`;
+    return formatFileSize(sizeBytes);
   }
 
   getContentType(file: File): string {

@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
-import { DocumentRecord } from './documents-api';
+import { DocumentRecord, normalizeUploadedAt } from './documents-api';
 
 export interface ShareLinkRecord {
   id: number;
@@ -46,7 +46,10 @@ export class ShareLinksApi {
         `${this.endpoint}/${encodeURIComponent(shortCode)}`,
         { params },
       ).pipe(timeout(15_000)),
-    );
+    ).then((document) => ({
+      ...document,
+      uploadedAt: normalizeUploadedAt(document.uploadedAt),
+    }));
   }
 
   async delete(id: number): Promise<void> {

@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { TimeoutError } from 'rxjs';
 import { Navbar } from '../../components/navbar/navbar';
-import { DocumentRecord } from '../../data/documents-api';
+import { DocumentRecord, formatFileSize } from '../../data/documents-api';
 import { ShareLinksApi } from '../../data/share-links-api';
 
 @Component({
@@ -24,6 +24,10 @@ export class SharePage implements OnInit {
   readonly document = signal<DocumentRecord | null>(null);
   readonly isSubmitting = signal(false);
   readonly errorMessage = signal('');
+
+  formatSize(sizeBytes: number): string {
+    return formatFileSize(sizeBytes);
+  }
 
   ngOnInit(): void {
     this.shortCode.set(this.route.snapshot.paramMap.get('shortCode') ?? '');

@@ -6,7 +6,7 @@ import { RouterLink } from '@angular/router';
 import { signal } from '@angular/core';
 import { TimeoutError } from 'rxjs';
 import { Navbar } from '../../components/navbar/navbar';
-import { DocumentCreateRequest, DocumentRecord, DocumentsApi } from '../../data/documents-api';
+import { DocumentCreateRequest, DocumentRecord, DocumentsApi, formatFileSize } from '../../data/documents-api';
 import { ShareLinkRecord, ShareLinksApi } from '../../data/share-links-api';
 import { AuthService } from '../../services/auth/auth';
 
@@ -49,7 +49,12 @@ export class Dashboard implements OnInit {
     this.errorMessage.set('');
 
     try {
-      this.documents.set(await this.documentsApi.list());
+      const documents = await this.documentsApi.list();
+      this.documents.set(
+        [...documents].sort(
+          (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+        ),
+      );
     } catch (error) {
       this.errorMessage.set(this.getRequestErrorMessage(
         error,
@@ -239,7 +244,7 @@ export class Dashboard implements OnInit {
   }
 
   formatSize(sizeBytes: number): string {
-    return `${sizeBytes.toLocaleString('de-DE')} Bytes`;
+    return formatFileSize(sizeBytes);
   }
 
   private getRequestErrorMessage(error: unknown, fallbackMessage: string): string {
