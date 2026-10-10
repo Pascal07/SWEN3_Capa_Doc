@@ -14,38 +14,336 @@ config:
         password: ""
       bypassProxy: ""
 
+request:
+  headers:
+    - name: Cookie
+      value: JSESSIONID={{sessionId}}; XSRF-TOKEN={{xsrfToken}}
+    - name: X-XSRF-TOKEN
+      value: "{{xsrfToken}}"
+
 docs:
   content: |
     # CapaDoc API – Bruno Collection
 
-    Diese Collection testet die REST-API des CapaDoc Semester-Projekts (SWEN3/BIF5,
-    Document-Management-System mit Document-Sharing-Feature).
+    Diese Bruno Collection testet die REST-API des **CapaDoc Semester-Projekts (SWEN3/BIF5)** – ein Document-Management-System mit Document-Sharing-Feature.
 
-    ## Zweck
+    ---
 
-    Automatisierte Requests + Tests für die Endpoints aus Sprint 1 (REST API, DAL):
+    ## 📌 Zweck
 
-    - **Documents** – Anlegen, Auflisten, Abrufen, Aktualisieren, Löschen von
-      Dokument-Metadaten (`/documents`)
-    - **Links** – Erstellen und Auflösen von passwortgeschützten, zeitlich
-      begrenzten Share-Links für Dokumente (`/documents/{id}/links`, `/links/{shortCode}`)
+    Die Collection enthält automatisierte Requests und Tests für die Endpoints aus **Sprint 1 (REST API, DAL)**.
 
-    ## Umfang
+    ### Documents
 
-    - 12 Requests, davon Happy-Path- und Negativ-/Validierungsfälle
-      (400 Bad Request, 401 Unauthorized, 404 Not Found, 410 Gone)
-    - Jeder Request enthält automatisierte Tests (Statuscode + Response-Shape)
-    - Variablen (`documentId`, `linkId`, `shortCode`, ...) werden automatisch
-      zwischen den Requests weitergereicht
+    Verwaltung von Dokument-Metadaten über:
 
-    ## Nutzung
+    ```text
+    /documents
+    ```
 
-    1. Environment (siehe "1 collection environment") auswählen und `baseUrl`
-       auf eure lokale API anpassen (`http://localhost:8080/api` o.ä.)
-    2. `01-Documents` und `02-Links` der Reihe nach über den Collection Runner
-       ausführen, oder einzeln testen
-    3. Bei rot markierten Tests: Response-Body mit den erwarteten Feldern
-       (`id`, `filename`, `contentType`, `sizeBytes`, `uploadedAt`) vergleichen
+    Getestete Operationen:
+
+    * Erstellen
+    * Auflisten
+    * Abrufen
+    * Aktualisieren
+    * Löschen
+
+    ### Links
+
+    Erstellen und Auflösen von **passwortgeschützten und zeitlich begrenzten Share-Links**:
+
+    ```text
+    /documents/{id}/links
+    /links/{shortCode}
+    ```
+
+    ---
+
+    ## 📦 Umfang
+
+    Die Collection enthält insgesamt **12 Requests**:
+
+    * ✅ Happy-Path-Szenarien
+    * ❌ Validierungs- und Negativfälle
+    * `400 Bad Request`
+    * `401 Unauthorized`
+    * `404 Not Found`
+    * `410 Gone`
+
+    Jeder Request enthält automatisierte Tests für:
+
+    * erwarteten HTTP-Statuscode
+    * Response-Shape
+    * erwartete Response-Felder
+
+    Wichtige Variablen werden automatisch zwischen den Requests weitergereicht, z. B.:
+
+    ```text
+    documentId
+    linkId
+    shortCode
+    ```
+
+    ---
+
+    # 🚀 Nutzung
+
+    ## 1. API starten
+
+    Stelle sicher, dass die CapaDoc-API lokal läuft.
+
+    Passe anschließend im Bruno-Environment **Local** die `baseUrl` an deine lokale API an, z. B.:
+
+    ```text
+    http://localhost:8080/api
+    ```
+
+    ---
+
+    ## 2. 🔐 Frische Secrets holen
+
+    Die API benötigt eine **gültige Login-Session** sowie einen **CSRF-Token**.
+
+    ### Im Browser einloggen
+
+    1. Öffne:
+
+       http://localhost:4200
+
+    2. Logge dich **neu** ein.
+
+    3. Öffne die Developer Tools mit:
+
+       ```text
+       F12
+       ```
+
+    4. Wechsle zum Tab **Application** bzw. **Speicher**.
+
+    5. Öffne:
+
+       ```text
+       Cookies → http://localhost:4200
+       ```
+
+    6. Kopiere die aktuellen Cookie-Werte.
+
+    ### In Bruno eintragen
+
+    Trage die Werte im Environment **Local** ein:
+
+    | Browser Cookie | Bruno Variable |
+    | -------------- | -------------- |
+    | `JSESSIONID`   | `sessionId`    |
+    | `XSRF-TOKEN`   | `xsrfToken`    |
+
+    > ⚠️ **Wichtig:** Verwende möglichst eine frisch eingeloggte Session. Alte oder abgelaufene Werte können zu `401 Unauthorized` führen.
+
+    ---
+
+    ## 3. 🍪 Bruno-Cookies leeren
+
+    Damit Bruno nicht versehentlich alte Cookies verwendet:
+
+    1. Klicke in Bruno unten rechts auf das **Cookie-Symbol**.
+
+    2. Suche nach Cookies für:
+
+       ```text
+       localhost
+       ```
+
+    3. Falls dort bereits Cookies vorhanden sind, **lösche diese**.
+
+    Dadurch werden keine veralteten Session-Cookies aus vorherigen Tests verwendet.
+
+    ---
+
+    ## 4. 📄 Create Document ausführen
+
+    Führe **zuerst** den Request:
+
+    ```text
+    Create Document
+    ```
+
+    aus.
+
+    Der Request sollte erfolgreich mit:
+
+    ```http
+    201 Created
+    ```
+
+    antworten.
+
+    Nach einem erfolgreichen Create wird die `documentId` automatisch aus der Response übernommen.
+
+    Beispiel:
+
+    ```text
+    Create Document
+          │
+          ▼
+      201 Created
+          │
+          ▼
+    documentId wird gesetzt
+          │
+          ▼
+    weitere Requests können ausgeführt werden
+    ```
+
+    ---
+
+    ## 5. ▶️ Collection ausführen
+
+    Danach können die Requests der Reihe nach ausgeführt werden:
+
+    ```text
+    01-Documents
+        │
+        ├── Create Document
+        ├── List Documents
+        ├── Get Document
+        ├── Update Document
+        └── Delete Document
+         
+    02-Links
+        │
+        ├── Create Link
+        ├── Resolve Link
+        └── weitere Negativ-/Validierungsfälle
+    ```
+
+    Alternativ können die Requests auch einzeln getestet werden.
+
+    Variablen wie
+
+    ```text
+    documentId
+    linkId
+    shortCode
+    ```
+
+    werden automatisch zwischen den Requests weitergereicht.
+
+    ---
+
+    # 🧪 Erwartete Responses
+
+    Bei den Document-Requests werden unter anderem folgende Felder erwartet:
+
+    ```json
+    {
+      "id": "...",
+      "filename": "...",
+      "contentType": "...",
+      "sizeBytes": 123,
+      "uploadedAt": "..."
+    }
+    ```
+
+    Wichtige Felder:
+
+    | Feld          | Beschreibung                |
+    | ------------- | --------------------------- |
+    | `id`          | Eindeutige ID des Dokuments |
+    | `filename`    | Dateiname                   |
+    | `contentType` | MIME-Type der Datei         |
+    | `sizeBytes`   | Dateigröße in Bytes         |
+    | `uploadedAt`  | Zeitpunkt des Uploads       |
+
+    ---
+
+    # ❗ Fehlerbehebung
+
+    ## `401 Unauthorized`
+
+    Prüfe:
+
+    * Ist die Session noch gültig?
+    * Wurde `JSESSIONID` frisch aus dem Browser kopiert?
+    * Wurde `XSRF-TOKEN` frisch aus dem Browser kopiert?
+    * Sind `sessionId` und `xsrfToken` im Bruno-Environment **Local** korrekt gesetzt?
+    * Wurden die alten Bruno-Cookies gelöscht?
+
+    ---
+
+    ## `404 Not Found`
+
+    Wenn ein Request mit einer `documentId` fehlschlägt, prüfe zuerst:
+
+    1. Wurde **Create Document** vorher erfolgreich ausgeführt?
+    2. Hat der Request mit `201 Created` geantwortet?
+    3. Wurde `documentId` automatisch übernommen?
+    4. Ist die verwendete `documentId` noch gültig?
+
+    > 💡 Ein `404` bei Requests, die ein Dokument benötigen, kann auftreten, wenn **Create Document** vorher nicht erfolgreich ausgeführt wurde oder die `documentId` nicht korrekt übernommen wurde.
+
+    ---
+
+    ## `400 Bad Request`
+
+    Prüfe die Request-Daten und die erwarteten Validierungsregeln.
+
+    Typische Ursachen:
+
+    * fehlende Pflichtfelder
+    * ungültige Werte
+    * falsches Datenformat
+    * ungültige Parameter
+
+    ---
+
+    ## `410 Gone`
+
+    Bei den Link-Tests kann `410 Gone` erwartet sein, wenn ein Share-Link:
+
+    * abgelaufen ist
+    * nicht mehr gültig ist
+    * aufgrund seiner zeitlichen Begrenzung nicht mehr verwendet werden darf
+
+    ---
+
+    # ✅ Empfohlene Reihenfolge
+
+    Für einen vollständigen Testlauf:
+
+    ```text
+    1. API starten
+           ↓
+    2. http://localhost:4200 öffnen
+           ↓
+    3. Neu einloggen
+           ↓
+    4. JSESSIONID kopieren
+           ↓
+    5. XSRF-TOKEN kopieren
+           ↓
+    6. Werte in Bruno → Environment → Local eintragen
+           ↓
+    7. Bruno-Cookies für localhost löschen
+           ↓
+    8. Create Document ausführen
+           ↓
+    9. 201 Created prüfen
+           ↓
+    10. documentId prüfen
+           ↓
+    11. 01-Documents ausführen
+           ↓
+    12. 02-Links ausführen
+    ```
+
+    ---
+
+    ## 🎯 Kurzfassung
+
+    > **Bei Problemen zuerst neu einloggen, `JSESSIONID` und `XSRF-TOKEN` aktualisieren, Bruno-Cookies löschen und anschließend `Create Document` erneut ausführen.**
+
+    Sobald **Create Document → `201 Created`** liefert, wird die `documentId` automatisch gesetzt und die nachfolgenden Requests können darauf aufbauen.
   type: text/markdown
 bundled: false
 extensions:

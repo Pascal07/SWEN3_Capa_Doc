@@ -34,7 +34,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/links/{shortCode}", "/api/links/{shortCode}").permitAll()
                         .requestMatchers("/api/ping", "/ping", "/error").permitAll()
                         .anyRequest().authenticated())
-                .oauth2Login(o -> o.defaultSuccessUrl(frontendUrl + "/", true))
+                .oauth2Login(o -> o.defaultSuccessUrl(frontendUrl + "/dashboard", true))
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .logout(l -> l.logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler()))

@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@omnedia/ngx-aurora": "^4.0.1"
+  }
+}
