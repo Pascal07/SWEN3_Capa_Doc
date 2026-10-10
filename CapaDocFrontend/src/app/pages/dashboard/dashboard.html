@@ -1,0 +1,196 @@
+<app-navbar />
+<main class="dashboard">
+	<div class="dashboard__inner">
+		<header class="dashboard__intro">
+			<div>
+				<p class="dashboard__eyebrow">DOKUMENTENBIBLIOTHEK</p>
+				<h1>Meine Dokumente</h1>
+				<p class="dashboard__subtitle">Deine Dateien an einem Ort.</p>
+			</div>
+			<div class="document-count" aria-label="Anzahl Dokumente">
+				{{ documents().length }} {{ documents().length === 1 ? 'Dokument' : 'Dokumente' }}
+			</div>
+		</header>
+
+		@if (errorMessage(); as error) {
+			@if (!editingDocument()) {
+				<p class="message message--error" role="alert">{{ error }}
+					@if (!auth.isLoggedIn()) {
+						<a class="upload-link" routerLink="/">Jetzt anmelden</a>
+					}
+				</p>
+			}
+		}
+		@if (successMessage(); as success) {
+			<p class="message message--success" role="status">{{ success }}</p>
+		}
+
+		<div class="dashboard__layout">
+			<section class="documents-panel" aria-labelledby="documents-heading">
+				<div class="panel-heading">
+					<div>
+						<h2 id="documents-heading">Dokumente</h2>
+						<p>Zuletzt hinzugefügte Dateien</p>
+					</div>
+					<button class="refresh-button" type="button" (click)="loadDocuments()" [disabled]="isLoading()" aria-label="Dokumente neu laden" title="Neu laden">
+						↻
+					</button>
+				</div>
+
+				@if (isLoading()) {
+					<p class="list-state" role="status">Dokumente werden geladen ...</p>
+				} @else if (errorMessage()) {
+					<p class="list-state" role="alert">Die Dokumentliste ist derzeit nicht verfügbar.</p>
+				} @else if (documents().length === 0) {
+					<div class="list-state empty-state">
+						<span class="empty-state__mark" aria-hidden="true">PDF</span>
+						<h3>Noch keine Dokumente</h3>
+						<p>Füge dein erstes PDF auf der Upload-Seite hinzu.</p>
+						<a class="upload-link" routerLink="/upload">Zum Upload</a>
+					</div>
+				} @else {
+					<ul class="document-list">
+						@for (document of documents(); track document.id) {
+							<li class="document-row">
+								<span class="file-mark" aria-hidden="true">{{ document.filename.split('.').pop()?.toUpperCase() }}</span>
+								<div class="document-row__details">
+									<h3>
+										<button class="document-name-button" type="button" (click)="openDocumentDetails(document)">
+											{{ document.filename }}
+										</button>
+									</h3>
+									<p>{{ document.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</p>
+								</div>
+								<span class="document-row__size">{{ formatSize(document.sizeBytes) }}</span>
+								<button
+									class="delete-button"
+									type="button"
+									(click)="deleteDocument(document)"
+									[disabled]="deletingId() === document.id"
+									[attr.aria-label]="'Dokument löschen: ' + document.filename">
+									{{ deletingId() === document.id ? 'Lösche ...' : 'Löschen' }}
+								</button>
+							</li>
+						}
+					</ul>
+				}
+			</section>
+
+		</div>
+	</div>
+</main>
+
+@if (editingDocument(); as document) {
+	<div class="dialog-backdrop">
+		<section
+			class="rename-dialog"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="rename-heading"
+			(keydown.escape)="cancelRename()">
+			<h2 id="rename-heading">Dokumentdetails</h2>
+			<p class="rename-dialog__description">{{ document.filename }}</p>
+			@if (isLoadingDetails()) {
+				<p class="list-state" role="status">Dokumentdetails werden geladen ...</p>
+			}
+
+			@if (detailError(); as error) {
+				<p class="message message--error" role="alert">{{ error }}</p>
+			}
+			@if (detailMessage(); as message) {
+				<p class="message message--success" role="status">{{ message }}</p>
+			}
+
+			@if (!isLoadingDetails()) {
+				<dl class="document-metadata">
+					<div><dt>Typ</dt><dd>{{ document.contentType }}</dd></div>
+					<div><dt>Größe</dt><dd>{{ formatSize(document.sizeBytes) }}</dd></div>
+					<div><dt>Hochgeladen</dt><dd>{{ document.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</dd></div>
+				</dl>
+
+				<form (ngSubmit)="saveFilename()">
+					<label class="rename-dialog__label" for="document-filename">Dateiname</label>
+					<div class="rename-dialog__filename">
+						<input
+							class="rename-dialog__input"
+							id="document-filename"
+							name="filename"
+							type="text"
+							[(ngModel)]="editedFilename"
+							[disabled]="isUpdating()"
+							required
+							autofocus>
+						@if (filenameExtension(); as extension) {
+							<span class="rename-dialog__extension" aria-label="Dateiendung, kann nicht geändert werden">{{ extension }}</span>
+						}
+					</div>
+					<div class="rename-dialog__actions">
+						<button class="rename-dialog__save" type="submit" [disabled]="!editedFilename.trim() || isUpdating()">
+							{{ isUpdating() ? 'Wird gespeichert ...' : 'Namen speichern' }}
+						</button>
+					</div>
+				</form>
+
+				<section class="share-link-section" aria-labelledby="share-links-heading">
+					<h3 id="share-links-heading">Share-Links</h3>
+					<p class="share-link-notice">Die API bietet derzeit keine Liste bereits vorhandener Links. Hier erscheinen Links, die du in dieser Sitzung erstellst.</p>
+
+					<form class="share-link-form" (ngSubmit)="createShareLink()">
+						<div class="rename-dialog__field">
+							<label class="rename-dialog__label" for="share-link-password">Passwort</label>
+							<input
+								class="rename-dialog__input rename-dialog__input--standalone"
+								id="share-link-password"
+								name="sharePassword"
+								type="password"
+								[(ngModel)]="sharePassword"
+								[disabled]="isCreatingShareLink()"
+								required>
+						</div>
+						<div class="rename-dialog__field">
+							<label class="rename-dialog__label" for="share-link-expiry">Ablaufdatum</label>
+							<input
+								class="rename-dialog__input rename-dialog__input--standalone"
+								id="share-link-expiry"
+								name="shareExpiryDate"
+								type="datetime-local"
+								[(ngModel)]="shareExpiryDate"
+								[disabled]="isCreatingShareLink()"
+								required>
+						</div>
+						<button class="rename-dialog__save" type="submit" [disabled]="!sharePassword.trim() || !shareExpiryDate || isCreatingShareLink()">
+							{{ isCreatingShareLink() ? 'Wird erstellt ...' : 'Link erstellen' }}
+						</button>
+					</form>
+
+					@if (shareLinks().length > 0) {
+						<ul class="share-link-list">
+							@for (link of shareLinks(); track link.id) {
+								<li>
+									<div>
+										<a [href]="shareLinkUrl(link)" target="_blank" rel="noopener noreferrer">{{ shareLinkUrl(link) }}</a>
+										<p>Gültig bis {{ link.expiryDate | date:'dd.MM.yyyy, HH:mm' }}</p>
+									</div>
+									<button type="button" (click)="copyShareLink(link)">Kopieren</button>
+									<button
+										class="delete-button"
+										type="button"
+										(click)="deleteShareLink(link)"
+										[disabled]="deletingShareLinkId() === link.id">
+										{{ deletingShareLinkId() === link.id ? 'Lösche ...' : 'Löschen' }}
+									</button>
+								</li>
+							}
+						</ul>
+					}
+				</section>
+			}
+
+			<div class="rename-dialog__actions">
+				<button class="rename-dialog__back" type="button" (click)="cancelRename()">
+					Zurück
+				</button>
+			</div>
+		</section>
+	</div>
+}

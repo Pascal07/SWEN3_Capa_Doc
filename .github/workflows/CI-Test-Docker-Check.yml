@@ -13,6 +13,9 @@ env:
   DB_NAME: capadoc_db
   DB_USER: capadoc_user
   DB_PASSWORD: capadoc_ci_password
+  GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+  GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+  APP_BASE_URL: http://localhost:4200
 
 jobs:
   build-and-smoke-test:

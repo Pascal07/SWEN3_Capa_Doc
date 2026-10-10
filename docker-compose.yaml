@@ -31,9 +31,24 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${DB_USER}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:4200}
     depends_on:
       db:
         condition: service_healthy
+
+  # --- Frontend ---
+  frontend:
+    build:
+      context: ./CapaDocFrontend
+      dockerfile: Dockerfile
+    container_name: capadoc-frontend
+    restart: unless-stopped
+    ports:
+      - "4200:80"
+    depends_on:
+      - api
 
 volumes:
   db-data:

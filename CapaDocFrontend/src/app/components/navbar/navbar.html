@@ -1,0 +1,16 @@
+<header class="page-header">
+  <a class="brand" routerLink="/dashboard" aria-label="CapaDoc Dashboard">CapaDoc</a>
+  <nav class="navbar" aria-label="Hauptnavigation">
+    <a class="navbar__link" routerLink="/dashboard" routerLinkActive="navbar__link--active" [routerLinkActiveOptions]="{ exact: true }" ariaCurrentWhenActive="page">Dashboard</a>
+    <a class="navbar__link" routerLink="/upload" routerLinkActive="navbar__link--active" ariaCurrentWhenActive="page">Upload document</a>
+    <a class="navbar__link" routerLink="/share" routerLinkActive="navbar__link--active" ariaCurrentWhenActive="page">Share document</a>
+  </nav>
+  <div class="account">
+    @if (auth.user(); as user) {
+      <span class="username">{{ user.name || user.email }}</span>
+      <button class="navbar__link" (click)="auth.logout()">Logout</button>
+    } @else {
+      <a class="navbar__link" routerLink="/">Anmelden</a>
+    }
+  </div>
+</header>
