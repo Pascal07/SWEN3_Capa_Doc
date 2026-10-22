@@ -1,20 +1,24 @@
 package at.capadocapi.service;
 
 import at.capadocapi.model.DocumentEntity;
+import at.capadocapi.model.dto.OcrMessage;
 import at.capadocapi.repository.DocumentRepository;
+import at.capadocapi.service.Interfaces.DocumentMessagePublisher;
 import at.capadocapi.service.Interfaces.DocumentService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepository documentRepository;
+    private final DocumentMessagePublisher messagePublisher;
 
     @Override
     public List<DocumentEntity> getAllDocuments() {
@@ -37,7 +41,17 @@ public class DocumentServiceImpl implements DocumentService {
             throw new IllegalArgumentException("DocumentEntity must not be null");
         }
         documentEntity.setUploadedAt(LocalDateTime.now());
-        return documentRepository.save(documentEntity);
+        DocumentEntity savedEntity = documentRepository.save(documentEntity);
+        log.info("Document saved to database with id={}", savedEntity.getId());
+
+        OcrMessage ocrMessage = new OcrMessage(
+                savedEntity.getId(),
+                savedEntity.getFilename(),
+                savedEntity.getContentType(),
+                savedEntity.getUploadedAt()
+        );
+        messagePublisher.publishOcrMessage(ocrMessage);
+        return savedEntity;
     }
 
     @Override
