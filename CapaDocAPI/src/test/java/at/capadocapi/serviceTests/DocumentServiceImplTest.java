@@ -1,9 +1,10 @@
 package at.capadocapi;
 
 import at.capadocapi.model.DocumentEntity;
+import at.capadocapi.model.dto.OcrMessage;
 import at.capadocapi.repository.DocumentRepository;
 import at.capadocapi.service.DocumentServiceImpl;
-import at.capadocapi.service.Interfaces.DocumentService;
+import at.capadocapi.service.Interfaces.DocumentMessagePublisher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -13,7 +14,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.EmptyResultDataAccessException;
 
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +25,9 @@ import static org.mockito.Mockito.*;
 public class DocumentServiceImplTest {
     @Mock
     private DocumentRepository documentRepository;
+
+    @Mock
+    private DocumentMessagePublisher messagePublisher;
 
     @InjectMocks
     private DocumentServiceImpl documentService;
@@ -125,6 +128,7 @@ public class DocumentServiceImplTest {
         // Assert
         assertThat(savedDocument).isEqualTo(doc1);
         verify(documentRepository).save(doc1);
+        verify(messagePublisher).publishOcrMessage(any(OcrMessage.class));
     }
 
     //  Test uploadedAt wird gesetzt: Prüfen, dass uploadedAt vor dem Speichern auf einen Wert
@@ -156,6 +160,7 @@ public class DocumentServiceImplTest {
         assertThat(capturedDocument.getUploadedAt())
                 .isAfterOrEqualTo(before)
                 .isBeforeOrEqualTo(after);
+        verify(messagePublisher).publishOcrMessage(any(OcrMessage.class));
     }
 
     @Test
