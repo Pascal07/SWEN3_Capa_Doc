@@ -4,6 +4,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1.1-brightgreen.svg?style=flat&logo=springboot)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16--alpine-blue.svg?style=flat&logo=postgresql)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg?style=flat&logo=docker)](https://www.docker.com/)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3--management--alpine-orange.svg?style=flat&logo=rabbitmq)](https://www.rabbitmq.com/)
 
 A Document Management System (DMS) designed for archiving documents with automated OCR processing, Gen-AI summaries, tagging, and full-text search.
 
@@ -63,6 +64,9 @@ A Document Management System (DMS) designed for archiving documents with automat
 
    - **Backend API:** Available at `http://localhost:8081`
    - **PostgreSQL:** Running on port `5432`
+   - **RabbitMQ AMQP:** Available on port `5672`
+   - **RabbitMQ Management UI:** Available at `http://localhost:15672`
+   - **OCR Worker:** Running as the `ocr-worker` container
 
 3. **Monitor Logs**
 
@@ -87,6 +91,57 @@ A Document Management System (DMS) designed for archiving documents with automat
    ```
 
    *(Add `-v` to also remove the database volume: `docker compose down -v`)*
+
+---
+
+## 🐇 RabbitMQ and OCR Worker
+
+RabbitMQ decouples document uploads from OCR processing. When the API accepts a
+document that requires OCR, it publishes a JSON message to the OCR exchange.
+The OCR Worker consumes the message asynchronously, so the API does not have
+to wait for OCR processing to finish.
+
+### RabbitMQ setup
+
+RabbitMQ is started by Docker Compose with the `rabbitmq:3-management-alpine`
+image. Configure its credentials in the root `.env` file:
+
+```env
+RABBITMQ_USER=your_user
+RABBITMQ_PASSWORD=your_password
+```
+
+The credentials are used by both the API and the OCR Worker. Do not commit
+real credentials to the repository.
+
+The RabbitMQ Management UI is available at
+[`http://localhost:15672`](http://localhost:15672) after startup. Log in with
+the configured `RABBITMQ_USER` and `RABBITMQ_PASSWORD`. The AMQP protocol used
+by the Spring Boot services remains available on port `5672`.
+
+### Exchanges, queues, and routing keys
+
+| Resource | Name | Purpose |
+| :--- | :--- | :--- |
+| OCR exchange | `ocr.exchange` | Direct exchange receiving OCR jobs |
+| OCR queue | `ocr.queue` | Durable queue consumed by the OCR Worker |
+| OCR routing key | `ocr.routingkey` | Routes messages from the exchange to `ocr.queue` |
+| Dead-letter exchange | `ocr.dlx` | Receives rejected or failed OCR messages |
+| Dead-letter queue | `ocr.dlq` | Stores messages that could not be processed |
+| Dead-letter routing key | `ocr.dlq.routingkey` | Routes messages to `ocr.dlq` |
+
+The API and Worker declare the OCR exchange, queue, and binding from their
+`capadoc.rabbitmq.*` configuration. The main queue is configured with the
+dead-letter exchange. Listener failures are not endlessly requeued; rejected
+messages are routed to the dead-letter flow for inspection in the Management
+UI.
+
+The Worker connects to the Compose service name `rabbitmq`. When running the
+Worker directly on the host, use `localhost` and ensure RabbitMQ is running
+locally or through Docker Compose.
+
+For the component relationships and message flow, see
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
