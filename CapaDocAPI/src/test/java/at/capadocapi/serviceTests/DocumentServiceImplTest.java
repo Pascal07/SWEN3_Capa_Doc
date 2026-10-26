@@ -3,6 +3,7 @@ package at.capadocapi;
 import at.capadocapi.model.DocumentEntity;
 import at.capadocapi.repository.DocumentRepository;
 import at.capadocapi.service.DocumentServiceImpl;
+import at.capadocapi.service.Interfaces.DocumentMessagePublisher;
 import at.capadocapi.service.Interfaces.DocumentService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +26,9 @@ import static org.mockito.Mockito.*;
 public class DocumentServiceImplTest {
     @Mock
     private DocumentRepository documentRepository;
+
+    @Mock
+    private DocumentMessagePublisher messagePublisher;
 
     @InjectMocks
     private DocumentServiceImpl documentService;
