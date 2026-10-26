@@ -1,18 +1,16 @@
 package at.capadocapi.exception;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
 import java.time.LocalDateTime;
 
-@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
 
     @ExceptionHandler(ShareLinkNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleShareLinkNotFound(ShareLinkNotFoundException ex) {
@@ -106,19 +104,5 @@ public class GlobalExceptionHandler {
                 LocalDateTime.now()
         );
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
-    @ExceptionHandler(QueuePublishException.class)
-    public ResponseEntity<ErrorResponse> handleQueuePublishException(QueuePublishException ex) {
-        log.error("RabbitMQ error while publishing message: {}", ex.getMessage(), ex);
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.SERVICE_UNAVAILABLE.value(),
-                HttpStatus.SERVICE_UNAVAILABLE.getReasonPhrase(),
-                "Der Messaging-Dienst (RabbitMQ) ist derzeit nicht erreichbar. Bitte versuchen Sie es später erneut.",
-                LocalDateTime.now()
-        );
-        return ResponseEntity
-                .status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(error);
     }
 }
