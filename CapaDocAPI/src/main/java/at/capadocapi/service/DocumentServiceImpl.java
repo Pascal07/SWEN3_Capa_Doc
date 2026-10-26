@@ -1,59 +1,108 @@
 package at.capadocapi.service;
 
+import at.capadocapi.exception.DataAccessLayerException;
+import at.capadocapi.exception.DocumentNotFoundException;
 import at.capadocapi.model.DocumentEntity;
+import at.capadocapi.model.dto.OcrMessage;
 import at.capadocapi.repository.DocumentRepository;
+import at.capadocapi.service.Interfaces.DocumentMessagePublisher;
 import at.capadocapi.service.Interfaces.DocumentService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
+import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepository documentRepository;
+    private final DocumentMessagePublisher messagePublisher;
 
     @Override
     public List<DocumentEntity> getAllDocuments() {
-        return documentRepository.findAll();
+        try {
+            return documentRepository.findAll();
+        } catch (DataAccessException ex) {
+            throw dataAccessException("Could not load documents", ex);
+        }
     }
 
     @Override
     public List<DocumentEntity> getDocumentsByOwner(String ownerSub) {
-        return documentRepository.findByOwnerSub(ownerSub);
+        try {
+            return documentRepository.findByOwnerSub(ownerSub);
+        } catch (DataAccessException ex) {
+            throw dataAccessException("Could not load documents for owner " + ownerSub, ex);
+        }
     }
 
     @Override
     public Optional<DocumentEntity> getDocumentById(Long id) {
-        return documentRepository.findById(id);
+        try {
+            return documentRepository.findById(id);
+        } catch (DataAccessException ex) {
+            throw dataAccessException("Could not load document " + id, ex);
+        }
     }
 
     @Override
+    @Transactional
     public DocumentEntity createDocument(DocumentEntity documentEntity) {
         if (documentEntity == null) {
             throw new IllegalArgumentException("DocumentEntity must not be null");
         }
         documentEntity.setUploadedAt(LocalDateTime.now());
-        return documentRepository.save(documentEntity);
+        final DocumentEntity savedEntity;
+        try {
+            savedEntity = documentRepository.save(documentEntity);
+        } catch (DataAccessException ex) {
+            throw dataAccessException("Could not save document", ex);
+        }
+        log.info("Document saved to database with id={}", savedEntity.getId());
+
+        OcrMessage ocrMessage = new OcrMessage(
+                savedEntity.getId(),
+                savedEntity.getFilename(),
+                savedEntity.getContentType(),
+                savedEntity.getUploadedAt()
+        );
+        messagePublisher.publishOcrMessage(ocrMessage);
+        return savedEntity;
     }
 
     @Override
     public DocumentEntity updateDocument(Long id, DocumentEntity updatedDocumentEntity) {
-        return documentRepository.findById(id)
-                .map(existingDocumentEntity -> {
-                    existingDocumentEntity.setFilename(updatedDocumentEntity.getFilename());
-                    existingDocumentEntity.setContentType(updatedDocumentEntity.getContentType());
-                    existingDocumentEntity.setSizeBytes(updatedDocumentEntity.getSizeBytes());
-                    return documentRepository.save(existingDocumentEntity);
-                })
-                .orElseThrow(() -> new IllegalArgumentException("Document not found with id: " + id));
+        try {
+            return documentRepository.findById(id)
+                    .map(existingDocumentEntity -> {
+                        existingDocumentEntity.setFilename(updatedDocumentEntity.getFilename());
+                        existingDocumentEntity.setContentType(updatedDocumentEntity.getContentType());
+                        existingDocumentEntity.setSizeBytes(updatedDocumentEntity.getSizeBytes());
+                        return documentRepository.save(existingDocumentEntity);
+                    })
+                    .orElseThrow(() -> new DocumentNotFoundException(id));
+        } catch (DataAccessException ex) {
+            throw dataAccessException("Could not update document " + id, ex);
+        }
     }
 
     @Override
     public void deleteDocument(Long id) {
-        documentRepository.deleteById(id);
+        try {
+            documentRepository.deleteById(id);
+        } catch (DataAccessException ex) {
+            throw dataAccessException("Could not delete document " + id, ex);
+        }
+    }
+
+    private DataAccessLayerException dataAccessException(String message, DataAccessException cause) {
+        log.error(message, cause);
+        return new DataAccessLayerException(message, cause);
     }
 }

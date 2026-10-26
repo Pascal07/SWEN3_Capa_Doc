@@ -1,6 +1,7 @@
 package at.capadocapi.controller;
 
 import at.capadocapi.mapper.DocumentMapper;
+import at.capadocapi.exception.DocumentNotFoundException;
 import at.capadocapi.model.DocumentEntity;
 import at.capadocapi.model.dto.DocumentRequestDTO;
 import at.capadocapi.model.dto.DocumentResponseDTO;
@@ -43,7 +44,7 @@ public class DocumentController {
             @AuthenticationPrincipal OidcUser user) {
         Optional<DocumentEntity> documentOpt = documentService.getDocumentById(id);
         if (documentOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
+            throw new DocumentNotFoundException(id);
         }
         DocumentEntity document = documentOpt.get();
         if (isForbidden(document, user)) {
@@ -71,19 +72,15 @@ public class DocumentController {
             @AuthenticationPrincipal OidcUser user) {
         Optional<DocumentEntity> existingOpt = documentService.getDocumentById(id);
         if (existingOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
+            throw new DocumentNotFoundException(id);
         }
         if (isForbidden(existingOpt.get(), user)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        try {
-            DocumentEntity toUpdate = documentMapper.toEntity(request);
-            DocumentEntity updated = documentService.updateDocument(id, toUpdate);
-            return ResponseEntity.ok(documentMapper.toResponseDto(updated));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        }
+        DocumentEntity toUpdate = documentMapper.toEntity(request);
+        DocumentEntity updated = documentService.updateDocument(id, toUpdate);
+        return ResponseEntity.ok(documentMapper.toResponseDto(updated));
     }
 
     @DeleteMapping("/{id}")
@@ -92,7 +89,7 @@ public class DocumentController {
             @AuthenticationPrincipal OidcUser user) {
         Optional<DocumentEntity> existingOpt = documentService.getDocumentById(id);
         if (existingOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
+            throw new DocumentNotFoundException(id);
         }
         if (isForbidden(existingOpt.get(), user)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
