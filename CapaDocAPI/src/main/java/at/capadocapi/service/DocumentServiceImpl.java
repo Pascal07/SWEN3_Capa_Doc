@@ -3,12 +3,9 @@ package at.capadocapi.service;
 import at.capadocapi.exception.DataAccessLayerException;
 import at.capadocapi.exception.DocumentNotFoundException;
 import at.capadocapi.model.DocumentEntity;
-import at.capadocapi.model.dto.OcrMessage;
 import at.capadocapi.repository.DocumentRepository;
-import at.capadocapi.service.Interfaces.DocumentMessagePublisher;
 import at.capadocapi.service.Interfaces.DocumentService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,13 +13,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepository documentRepository;
-    private final DocumentMessagePublisher messagePublisher;
 
     @Override
     public List<DocumentEntity> getAllDocuments() {
