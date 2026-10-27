@@ -1,8 +1,10 @@
 package at.capadocapi;
 
 import at.capadocapi.model.DocumentEntity;
+import at.capadocapi.model.dto.OcrMessage;
 import at.capadocapi.repository.DocumentRepository;
 import at.capadocapi.service.DocumentServiceImpl;
+import at.capadocapi.service.Interfaces.DocumentMessagePublisher;
 import at.capadocapi.service.Interfaces.DocumentService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +27,9 @@ import static org.mockito.Mockito.*;
 public class DocumentServiceImplTest {
     @Mock
     private DocumentRepository documentRepository;
+
+    @Mock
+    private DocumentMessagePublisher messagePublisher;
 
     @InjectMocks
     private DocumentServiceImpl documentService;
@@ -125,6 +130,44 @@ public class DocumentServiceImplTest {
         // Assert
         assertThat(savedDocument).isEqualTo(doc1);
         verify(documentRepository).save(doc1);
+    }
+
+    @Test
+    void createDocument_validDocument_publishesOcrMessageAfterSaving() {
+        DocumentEntity document = new DocumentEntity();
+        document.setId(7L);
+        document.setFilename("report.pdf");
+        document.setContentType("application/pdf");
+        document.setSizeBytes(1024L);
+
+        when(documentRepository.save(document)).thenReturn(document);
+
+        documentService.createDocument(document);
+
+        ArgumentCaptor<OcrMessage> messageCaptor = ArgumentCaptor.forClass(OcrMessage.class);
+        verify(messagePublisher).publishOcrMessage(messageCaptor.capture());
+        OcrMessage message = messageCaptor.getValue();
+        assertThat(message.getDocumentId()).isEqualTo(7L);
+        assertThat(message.getFilename()).isEqualTo("report.pdf");
+        assertThat(message.getContentType()).isEqualTo("application/pdf");
+        assertThat(message.getUploadedAt()).isEqualTo(document.getUploadedAt());
+        verify(documentRepository).save(document);
+    }
+
+    @Test
+    void createDocument_publisherFails_propagatesPublishingException() {
+        DocumentEntity document = new DocumentEntity();
+        document.setId(7L);
+        document.setFilename("report.pdf");
+        when(documentRepository.save(document)).thenReturn(document);
+        RuntimeException publishingFailure = new RuntimeException("broker unavailable");
+        doThrow(publishingFailure).when(messagePublisher).publishOcrMessage(any(OcrMessage.class));
+
+        assertThatThrownBy(() -> documentService.createDocument(document))
+                .isSameAs(publishingFailure);
+
+        verify(documentRepository).save(document);
+        verify(messagePublisher).publishOcrMessage(any(OcrMessage.class));
     }
 
     //  Test uploadedAt wird gesetzt: Prüfen, dass uploadedAt vor dem Speichern auf einen Wert

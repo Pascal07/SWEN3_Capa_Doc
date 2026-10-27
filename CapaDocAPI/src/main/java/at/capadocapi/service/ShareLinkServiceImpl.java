@@ -8,6 +8,8 @@ import at.capadocapi.model.dto.ShareLinkResponseDTO;
 import at.capadocapi.exception.InvalidShareLinkPasswordException;
 import at.capadocapi.exception.ShareLinkExpiredException;
 import at.capadocapi.exception.ShareLinkNotFoundException;
+import at.capadocapi.exception.DataAccessLayerException;
+import at.capadocapi.exception.DocumentNotFoundException;
 import at.capadocapi.model.DocumentEntity;
 import at.capadocapi.model.ShareLinkEntity;
 import at.capadocapi.repository.DocumentRepository;
@@ -16,6 +18,7 @@ import at.capadocapi.service.Interfaces.ShareLinkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
@@ -41,18 +44,28 @@ public class ShareLinkServiceImpl implements ShareLinkService {
     @Override
     @Transactional
     public ShareLinkResponseDTO createShareLink(Long documentId, ShareLinkRequestDTO request) {
-        DocumentEntity document = documentRepository.findById(documentId)
-                .orElseThrow(() -> new IllegalArgumentException("Document not found with id: " + documentId));
+        final DocumentEntity document;
+        try {
+            document = documentRepository.findById(documentId)
+                    .orElseThrow(() -> new DocumentNotFoundException(documentId));
+        } catch (DataAccessException ex) {
+            throw dataAccessException("Could not load document " + documentId, ex);
+        }
 
         ShareLinkEntity link = shareLinkMapper.toEntity(request);
         link.setShortCode(generateUniqueShortCode());
         link.setPasswordHash(passwordEncoder.encode(request.getPassword()));
 
-        ShareLinkEntity savedLink = shareLinkRepository.save(link);
+        final ShareLinkEntity savedLink;
+        try {
+            savedLink = shareLinkRepository.save(link);
 
-        // DocumentEntity owns the join table, so the link must be added on that side
-        document.getShareLinks().add(savedLink);
-        documentRepository.save(document);
+            // DocumentEntity owns the join table, so the link must be added on that side
+            document.getShareLinks().add(savedLink);
+            documentRepository.save(document);
+        } catch (DataAccessException ex) {
+            throw dataAccessException("Could not create share link for document " + documentId, ex);
+        }
 
         return shareLinkMapper.toResponseDto(savedLink);
     }
@@ -81,17 +94,26 @@ public class ShareLinkServiceImpl implements ShareLinkService {
     @Override
     @Transactional
     public void deleteShareLink(Long id) {
-        ShareLinkEntity link = shareLinkRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Share link not found with id: " + id));
+        final ShareLinkEntity link;
+        try {
+            link = shareLinkRepository.findById(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Share link not found with id: " + id));
 
-        // remove the association from the owning side first, otherwise the
-        // join-table foreign key stops the delete from succeeding
-        for (DocumentEntity document : link.getDocuments()) {
-            document.getShareLinks().remove(link);
-            documentRepository.save(document);
+            // remove the association from the owning side first, otherwise the
+            // join-table foreign key stops the delete from succeeding
+            for (DocumentEntity document : link.getDocuments()) {
+                document.getShareLinks().remove(link);
+                documentRepository.save(document);
+            }
+
+            shareLinkRepository.delete(link);
+        } catch (DataAccessException ex) {
+            throw dataAccessException("Could not delete share link " + id, ex);
         }
+    }
 
-        shareLinkRepository.delete(link);
+    private DataAccessLayerException dataAccessException(String message, DataAccessException cause) {
+        return new DataAccessLayerException(message, cause);
     }
 
     private String generateUniqueShortCode() {
