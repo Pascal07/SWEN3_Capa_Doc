@@ -10,29 +10,35 @@ documented separately in [OAuth2 & Google Login](OAUTH2_GOOGLE_LOGIN.md).
 flowchart LR
     Browser[Angular Frontend] -->|HTTP / API requests| API[Spring Boot API]
     API --> DB[(PostgreSQL)]
+    API -->|upload / download PDF| RustFS[(RustFS S3 Bucket)]
     API -->|publish JSON OCR job| Exchange[ocr.exchange]
     Exchange -->|ocr.routingkey| Queue[(ocr.queue)]
-    Queue --> Worker[OCR Worker]
-    Queue -. rejected messages .-> DLX[ocr.dlx]
+    Queue --> Worker["OCR Worker\n(Ghostscript + Tesseract)"]
+    Worker -->|download PDF| RustFS
+    Worker -->|update ocrStatus| DB
+    Worker -->|publish IndexingMessage| IdxExchange[indexing.exchange]
+    IdxExchange -->|indexing.routingkey| IdxQueue[(indexing.queue)]
+    Queue -. rejected / exhausted retries .-> DLX[ocr.dlx]
     DLX -->|ocr.dlq.routingkey| DLQ[(ocr.dlq)]
-    Worker -->|future OCR result updates| DB
 ```
 
-The frontend communicates with the Spring Boot API. The API persists document
-metadata in PostgreSQL and publishes OCR jobs to RabbitMQ when asynchronous
-text extraction is needed. The OCR Worker consumes those jobs independently.
-This keeps document requests responsive and allows worker capacity to be
-scaled separately from the API.
+The frontend communicates with the Spring Boot API. The API stores PDF binaries
+in RustFS, persists document metadata in PostgreSQL, and publishes OCR jobs to
+RabbitMQ when asynchronous text extraction is needed. The OCR Worker consumes
+those jobs independently, converts PDF pages to PNGs via Ghostscript, extracts
+text via Tesseract OCR, updates `ocrStatus` in PostgreSQL, and publishes the
+extracted text to `indexing.queue`.
 
 ## Components
 
 | Component | Responsibility | Docker Compose service |
 | :--- | :--- | :--- |
 | Angular Frontend | User interface and API client | `frontend` |
-| Spring Boot API | REST API, document metadata, message publisher | `api` |
-| PostgreSQL | Persistent document metadata | `db` |
+| Spring Boot API | REST API, document metadata, S3 upload/download, message publisher | `api` |
+| PostgreSQL | Persistent document metadata & processing status | `db` |
+| RustFS | S3-compatible object storage for PDF binaries (`documents` bucket) | `rustfs` |
 | RabbitMQ | Durable message transport and management UI | `rabbitmq` |
-| OCR Worker | Consumes OCR jobs and performs OCR processing | `ocr-worker` |
+| OCR Worker | Downloads PDF from RustFS, runs Ghostscript + Tesseract OCR, publishes to `indexing.queue` | `ocr-worker` |
 
 The API and OCR Worker receive the RabbitMQ host, port, username, and password
 through environment variables. Inside the Compose network, both services use
@@ -41,18 +47,11 @@ browser-facing Management UI on port `15672`.
 
 ## OCR message flow
 
-1. A document is uploaded through the frontend/API.
-2. The API publishes an `OcrMessage` as JSON to the direct exchange
-   `ocr.exchange` with routing key `ocr.routingkey`.
-3. RabbitMQ routes the message to the durable queue `ocr.queue`.
-4. The OCR Worker listens to `ocr.queue`, deserializes the JSON message, and
-   processes the document asynchronously.
-5. If message processing is rejected, the queue's dead-letter configuration
-   routes the message through `ocr.dlx` to `ocr.dlq`.
-
-The current Worker contains the OCR processing integration point and logs the
-received document information. The actual OCR implementation can be added
-there without changing the API's message-publishing contract.
+1. A PDF document is uploaded through the frontend/API (`POST /api/documents`).
+2. The API uploads the PDF to RustFS (`documents/<id>/<uuid>-<filename>.pdf`), saves metadata with `ocrStatus = PENDING` in PostgreSQL, and publishes an `OcrMessage` (`documentId`, `storageKey`, `filename`, `contentType`, `uploadedAt`) to `ocr.exchange` (`ocr.routingkey` -> `ocr.queue`).
+3. The OCR Worker consumes `OcrMessage` from `ocr.queue`, checks idempotency (`ocrStatus == DONE`), downloads the PDF from RustFS, renders pages to PNG via Ghostscript (`gs`), and extracts text page-by-page via Tesseract (`tesseract -l deu+eng`).
+4. On success, the OCR Worker sets `ocrStatus = DONE` in PostgreSQL and publishes an `IndexingMessage` (`documentId`, `storageKey`, `filename`, `extractedText`, `processedAt`) to `indexing.exchange` (`indexing.routingkey` -> `indexing.queue`).
+5. On permanent errors (missing object in RustFS, invalid/password-protected PDF), the OCR Worker immediately marks `ocrStatus = FAILED` without retrying. On transient errors (timeout, temporary S3 error), it retries with exponential backoff and forwards exhausted messages to `ocr.dlq`.
 
 ## Reliability and operations
 

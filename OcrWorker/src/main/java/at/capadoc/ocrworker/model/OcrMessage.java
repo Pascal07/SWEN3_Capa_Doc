@@ -13,7 +13,20 @@ import java.time.LocalDateTime;
 @Builder
 public class OcrMessage {
     private Long documentId;
+    private String storageKey;
     private String filename;
     private String contentType;
     private LocalDateTime uploadedAt;
+
+    public OcrMessage(Long documentId, String filename, String contentType, LocalDateTime uploadedAt) {
+        this.documentId = documentId;
+        this.filename = filename;
+        this.contentType = contentType;
+        this.uploadedAt = uploadedAt;
+    }
+
+    public OcrMessage(Long documentId, String storageKey) {
+        this.documentId = documentId;
+        this.storageKey = storageKey;
+    }
 }

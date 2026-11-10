@@ -29,6 +29,7 @@ A Document Management System (DMS) designed for archiving documents with automat
 | **Database** | PostgreSQL | 16-Alpine |
 | **Object Storage** | RustFS (S3-compatible) | 1.0.4 (AWS SDK for Java v2) |
 | **Message Broker** | RabbitMQ | 3-management-alpine |
+| **OCR Engine** | Tesseract OCR & Ghostscript | Local container execution (`deu+eng`, 300 DPI) |
 | **Search Engine** | Elasticsearch | *(Planned / In Integration)* |
 | **Containerization**| Docker & Docker Compose | Multi-stage build |
 | **API Testing** | Bruno | Pre-configured collection |
@@ -135,16 +136,54 @@ by the Spring Boot services remains available on port `5672`.
 | Dead-letter exchange | `ocr.dlx` | Receives rejected or failed OCR messages |
 | Dead-letter queue | `ocr.dlq` | Stores messages that could not be processed |
 | Dead-letter routing key | `ocr.dlq.routingkey` | Routes messages to `ocr.dlq` |
+| Indexing exchange | `indexing.exchange` | Direct exchange receiving extracted OCR text |
+| Indexing queue | `indexing.queue` | Durable queue holding `IndexingMessage` payloads for downstream indexing |
+| Indexing routing key | `indexing.routingkey` | Routes messages from `indexing.exchange` to `indexing.queue` |
 
-The API and Worker declare the OCR exchange, queue, and binding from their
-`capadoc.rabbitmq.*` configuration. The main queue is configured with the
-dead-letter exchange. Listener failures are not endlessly requeued; rejected
-messages are routed to the dead-letter flow for inspection in the Management
-UI.
+### OCR Pipeline Architecture (`Upload -> RustFS -> OCR-Queue -> OCR-Worker -> Indexing-Queue`)
 
-The Worker connects to the Compose service name `rabbitmq`. When running the
-Worker directly on the host, use `localhost` and ensure RabbitMQ is running
-locally or through Docker Compose.
+```mermaid
+flowchart LR
+    Client["Frontend / Client"] -->|"1. POST /api/documents (PDF)"| API["CapaDocAPI"]
+    API -->|"2. Upload PDF (storageKey)"| RustFS[("RustFS Bucket\n(documents)")]
+    API -->|"3. Save Metadata\n(ocrStatus = PENDING)"| DB[("PostgreSQL")]
+    API -->|"4. OcrMessage\n(documentId, storageKey)"| OcrQ[["RabbitMQ\nocr.queue"]]
+    OcrQ -->|"5. Consume OcrMessage"| Worker["OcrWorker\n(Ghostscript + Tesseract)"]
+    Worker -->|"6. Download PDF"| RustFS
+    Worker -->|"7. Update ocrStatus\n(DONE / FAILED)"| DB
+    Worker -->|"8. IndexingMessage\n(documentId, extractedText)"| IdxQ[["RabbitMQ\nindexing.queue"]]
+    Worker -.->|"Transient failure after retries"| DLQ[["RabbitMQ\nocr.dlq"]]
+```
+
+1. **Upload & Storage:** `CapaDocAPI` accepts a `multipart/form-data` PDF upload, stores the binary in **RustFS** under `documents/<id>/<uuid>-<filename>.pdf`, saves metadata with `ocrStatus = PENDING` in PostgreSQL, and publishes an `OcrMessage` (`documentId`, `storageKey`, `filename`, `contentType`, `uploadedAt`) to `ocr.queue`.
+2. **Download & Rasterization (Ghostscript):** `OcrWorker` consumes the message, checks idempotency (skips if `ocrStatus == DONE`), downloads the PDF bytes from RustFS into an isolated temporary directory (`Files.createTempDirectory`), and converts each PDF page to a 24-bit color PNG at configurable DPI using **Ghostscript**:
+   ```text
+   gs -dNOPAUSE -dBATCH -dSAFER -sDEVICE=png16m -r300 -sOutputFile=<tmp>/page-%03d.png <tmp>/input.pdf
+   ```
+3. **Text Extraction (Tesseract OCR):** Each rendered page (`page-001.png`, `page-002.png`, ...) is processed in strict page order via **Tesseract**:
+   ```text
+   tesseract <page.png> stdout -l deu+eng
+   ```
+   All external processes are invoked via `ProcessBuilder` with an explicit argument list (no shell execution), bounded by a per-page timeout, and the temporary directory is always deleted recursively in a `finally` block.
+4. **Status Update & Indexing Queue:** Upon success, `OcrWorker` sets `ocrStatus = DONE` in PostgreSQL and publishes an `IndexingMessage` (`documentId`, `storageKey`, `filename`, `extractedText`, `processedAt`) to `indexing.queue`.
+5. **Error Handling:**
+   - **Permanent errors** (missing object in RustFS, corrupt/password-protected PDF, page limit exceeded, missing binary): No retry; `ocrStatus` is immediately set to `FAILED`.
+   - **Transient errors** (process timeout, temporary S3/network errors): Retried with exponential backoff (`ocr.max-retries`, default `3`). After exhausting retries, `ocrStatus` is set to `FAILED` and the message is published to `ocr.dlq`.
+
+### OCR Configuration (`ocr.*`)
+
+Configure the OCR Worker via environment variables in `.env` (or `OcrWorker/src/main/resources/application.yml`):
+
+| Property | Environment Variable | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `ocr.languages` | `OCR_LANGUAGES` | `deu+eng` | Tesseract language packs (`deu`, `eng`, `deu+eng`) |
+| `ocr.dpi` | `OCR_DPI` | `300` | Ghostscript rasterization resolution in DPI |
+| `ocr.timeout-per-page` | `OCR_TIMEOUT_PER_PAGE` | `60s` | Timeout per page / Ghostscript run |
+| `ocr.tesseract-command` | `OCR_TESSERACT_COMMAND` | `tesseract` | Path or name of the Tesseract executable |
+| `ocr.ghostscript-command` | `OCR_GHOSTSCRIPT_COMMAND` | `gs` | Path or name of the Ghostscript executable |
+| `ocr.temp-dir` | `OCR_TEMP_DIR` | `/tmp/capadoc-ocr` | Base directory for temporary OCR working folders |
+| `ocr.max-pages` | `OCR_MAX_PAGES` | `200` | Maximum allowed pages per PDF |
+| `ocr.max-pdf-size-bytes` | `OCR_MAX_PDF_SIZE_BYTES` | `52428800` (50 MB) | Maximum allowed PDF byte size |
 
 For the component relationships and message flow, see
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
@@ -184,17 +223,29 @@ A pre-configured Bruno collection is included in the repository.
 
 ---
 
-## 💻 Local Development (Without Docker for Backend)
+## 💻 Local Development (Without Docker for Backend / OCR Worker)
 
-If you prefer to run the Spring Boot API directly on your host machine:
+If you prefer to run the Spring Boot API and OCR Worker directly on your host machine:
 
-1. **Start only the PostgreSQL database**:
+1. **Start infrastructure services (PostgreSQL, RabbitMQ, RustFS)**:
    ```bash
-   docker compose up -d db
+   docker compose up -d db rabbitmq rustfs
    ```
 
-2. **Run the backend using the Maven wrapper**:
+2. **Run the backend API using the Maven wrapper**:
    ```bash
    cd CapaDocAPI
    ./mvnw spring-boot:run
+   ```
+
+3. **Run the OCR Worker locally** *(requires `tesseract-ocr`, `tesseract-ocr-deu`, `tesseract-ocr-eng`, and `ghostscript` installed on the host)*:
+   ```bash
+   cd OcrWorker
+   ./mvnw spring-boot:run
+   ```
+
+4. **Run unit & integration tests**:
+   ```bash
+   cd CapaDocAPI && ./mvnw test
+   cd ../OcrWorker && ./mvnw test
    ```
