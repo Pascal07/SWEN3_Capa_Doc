@@ -1,6 +1,6 @@
 package at.capadocapi.model.dto;
 
-import at.capadocapi.model.DocumentEntity;
+import at.capadocapi.model.ProcessingStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,5 +20,8 @@ public class DocumentResponseDTO {
     private Long sizeBytes;
     private LocalDateTime uploadedAt;
     private String ownerSub;
+    private String storageKey;
+    private ProcessingStatus ocrStatus;
+    private ProcessingStatus indexStatus;
 
 }

@@ -63,6 +63,14 @@
 								</div>
 								<span class="document-row__size">{{ formatSize(document.sizeBytes) }}</span>
 								<button
+									class="download-button"
+									type="button"
+									(click)="downloadDocument(document)"
+									[disabled]="downloadingId() === document.id"
+									[attr.aria-label]="'Dokument herunterladen: ' + document.filename">
+									{{ downloadingId() === document.id ? 'Lädt ...' : 'Download' }}
+								</button>
+								<button
 									class="delete-button"
 									type="button"
 									(click)="deleteDocument(document)"
@@ -106,6 +114,9 @@
 					<div><dt>Typ</dt><dd>{{ document.contentType }}</dd></div>
 					<div><dt>Größe</dt><dd>{{ formatSize(document.sizeBytes) }}</dd></div>
 					<div><dt>Hochgeladen</dt><dd>{{ document.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</dd></div>
+					<div><dt>Storage-Key</dt><dd>{{ document.storageKey ?? ('documents/' + document.id + '.pdf') }}</dd></div>
+					<div><dt>OCR-Status</dt><dd>{{ document.ocrStatus ?? 'PENDING' }}</dd></div>
+					<div><dt>Index-Status</dt><dd>{{ document.indexStatus ?? 'PENDING' }}</dd></div>
 				</dl>
 
 				<form (ngSubmit)="saveFilename()">
@@ -125,6 +136,13 @@
 						}
 					</div>
 					<div class="rename-dialog__actions">
+						<button
+							class="rename-dialog__back"
+							type="button"
+							(click)="downloadDocument(document)"
+							[disabled]="downloadingId() === document.id">
+							{{ downloadingId() === document.id ? 'Wird geladen ...' : 'PDF herunterladen' }}
+						</button>
 						<button class="rename-dialog__save" type="submit" [disabled]="!editedFilename.trim() || isUpdating()">
 							{{ isUpdating() ? 'Wird gespeichert ...' : 'Namen speichern' }}
 						</button>
@@ -133,7 +151,7 @@
 
 				<section class="share-link-section" aria-labelledby="share-links-heading">
 					<h3 id="share-links-heading">Share-Links</h3>
-					<p class="share-link-notice">Die API bietet derzeit keine Liste bereits vorhandener Links. Hier erscheinen Links, die du in dieser Sitzung erstellst.</p>
+					<p class="share-link-notice">Erstelle passwortgeschützte Links mit Ablaufdatum für dieses Dokument.</p>
 
 					<form class="share-link-form" (ngSubmit)="createShareLink()">
 						<div class="rename-dialog__field">

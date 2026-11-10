@@ -61,7 +61,13 @@
             <div><dt>Größe</dt><dd>{{ formatSize(sharedDocument.sizeBytes) }}</dd></div>
             <div><dt>Hochgeladen</dt><dd>{{ sharedDocument.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</dd></div>
           </dl>
-          <p class="download-notice">Der Server stellt aktuell nur Dokument-Metadaten bereit. Ein Datei-Download ist über die vorhandene API noch nicht verfügbar.</p>
+          <button
+            class="share-submit"
+            type="button"
+            (click)="downloadSharedDocument()"
+            [disabled]="isDownloading()">
+            {{ isDownloading() ? 'Wird heruntergeladen ...' : 'PDF herunterladen' }}
+          </button>
         </section>
       }
     </section>

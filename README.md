@@ -3,6 +3,7 @@
 [![Java](https://img.shields.io/badge/Java-25-orange.svg?style=flat&logo=openjdk)](https://adoptium.net/)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1.1-brightgreen.svg?style=flat&logo=springboot)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16--alpine-blue.svg?style=flat&logo=postgresql)](https://www.postgresql.org/)
+[![RustFS](https://img.shields.io/badge/RustFS-1.0.4_(S3)-DEA584.svg?style=flat&logo=rust)](https://rustfs.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg?style=flat&logo=docker)](https://www.docker.com/)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3--management--alpine-orange.svg?style=flat&logo=rabbitmq)](https://www.rabbitmq.com/)
 
@@ -26,6 +27,8 @@ A Document Management System (DMS) designed for archiving documents with automat
 | :--- | :--- | :--- |
 | **Backend** | Java / Spring Boot | Eclipse Temurin 25 / Spring Boot 4.1.1 |
 | **Database** | PostgreSQL | 16-Alpine |
+| **Object Storage** | RustFS (S3-compatible) | 1.0.4 (AWS SDK for Java v2) |
+| **Message Broker** | RabbitMQ | 3-management-alpine |
 | **Search Engine** | Elasticsearch | *(Planned / In Integration)* |
 | **Containerization**| Docker & Docker Compose | Multi-stage build |
 | **API Testing** | Bruno | Pre-configured collection |
@@ -63,7 +66,10 @@ A Document Management System (DMS) designed for archiving documents with automat
    ```
 
    - **Backend API:** Available at `http://localhost:8081`
+   - **Frontend UI:** Available at `http://localhost:4200`
    - **PostgreSQL:** Running on port `5432`
+   - **RustFS S3 API:** Available on port `9000`
+   - **RustFS Web Console:** Available at `http://localhost:9001`
    - **RabbitMQ AMQP:** Available on port `5672`
    - **RabbitMQ Management UI:** Available at `http://localhost:15672`
    - **OCR Worker:** Running as the `ocr-worker` container
@@ -141,7 +147,9 @@ Worker directly on the host, use `localhost` and ensure RabbitMQ is running
 locally or through Docker Compose.
 
 For the component relationships and message flow, see
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
+[`docs/RUSTFS_OBJECT_STORAGE.md`](docs/RUSTFS_OBJECT_STORAGE.md), and
+[`docs/OAUTH2_GOOGLE_LOGIN.md`](docs/OAUTH2_GOOGLE_LOGIN.md).
 
 ---
 
@@ -154,9 +162,10 @@ Base URL: `http://localhost:8081`
 | `GET` | `/api/ping` | Health check endpoint |
 | `GET` | `/api/documents` | Retrieve all documents |
 | `GET` | `/api/documents/{id}` | Retrieve a document by ID |
-| `POST` | `/api/documents` | Create document metadata |
+| `GET` | `/api/documents/{id}/download` | Download a PDF document from RustFS |
+| `POST` | `/api/documents` | Upload a PDF document (multipart/form-data) |
 | `PUT` | `/api/documents/{id}` | Update document metadata |
-| `DELETE` | `/api/documents/{id}` | Delete a document |
+| `DELETE` | `/api/documents/{id}` | Delete a document from RustFS and PostgreSQL |
 
 ---
 

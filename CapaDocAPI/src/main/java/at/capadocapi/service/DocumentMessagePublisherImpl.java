@@ -32,8 +32,9 @@ public class DocumentMessagePublisherImpl implements DocumentMessagePublisher {
     public void publishOcrMessage(OcrMessage message) {
         try {
             log.info(
-                    "Sending OCR message to queue for documentId={}, filename={}",
+                    "Sending OCR message to queue for documentId={}, storageKey={}, filename={}",
                     message.getDocumentId(),
+                    message.getStorageKey(),
                     message.getFilename()
             );
 

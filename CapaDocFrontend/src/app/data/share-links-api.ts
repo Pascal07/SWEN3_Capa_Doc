@@ -35,6 +35,20 @@ export class ShareLinksApi {
     return link;
   }
 
+  async listForDocument(documentId: number): Promise<ShareLinkRecord[]> {
+    try {
+      const links = await firstValueFrom(
+        this.http.get<ShareLinkRecord[]>(
+          `${this.endpoint}/document/${documentId}`,
+        ).pipe(timeout(15_000)),
+      );
+      this.createdByDocument.set(documentId, links);
+      return links;
+    } catch {
+      return this.createdForDocument(documentId);
+    }
+  }
+
   createdForDocument(documentId: number): ShareLinkRecord[] {
     return this.createdByDocument.get(documentId) ?? [];
   }
@@ -50,6 +64,16 @@ export class ShareLinksApi {
       ...document,
       uploadedAt: normalizeUploadedAt(document.uploadedAt),
     }));
+  }
+
+  download(shortCode: string, password: string): Promise<Blob> {
+    const params = new HttpParams().set('password', password);
+    return firstValueFrom(
+      this.http.get(
+        `${this.endpoint}/${encodeURIComponent(shortCode)}/download`,
+        { params, responseType: 'blob' },
+      ).pipe(timeout(30_000)),
+    );
   }
 
   async delete(id: number): Promise<void> {

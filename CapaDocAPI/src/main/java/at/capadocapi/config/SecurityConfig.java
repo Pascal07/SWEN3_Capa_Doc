@@ -35,7 +35,11 @@ public class SecurityConfig {
                                     ObjectMapper objectMapper) throws Exception {
         http
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers(HttpMethod.GET, "/links/{shortCode}", "/api/links/{shortCode}").permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/links/{shortCode}",
+                                "/api/links/{shortCode}",
+                                "/links/{shortCode}/download",
+                                "/api/links/{shortCode}/download").permitAll()
                         .requestMatchers("/api/ping", "/ping", "/error").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(o -> o.defaultSuccessUrl(frontendUrl + "/dashboard", true))

@@ -26,11 +26,40 @@ export class HttpDocumentsApi extends DocumentsApi {
     );
   }
 
-  create(request: DocumentCreateRequest): Promise<DocumentRecord> {
+  upload(file: File, filename?: string): Promise<DocumentRecord> {
+    const cleanFilename = (filename ?? file.name).trim() || 'document.pdf';
+    const pdfBlob = file.type === 'application/pdf'
+      ? file
+      : new Blob([file], { type: 'application/pdf' });
+
+    const formData = new FormData();
+    formData.append('file', pdfBlob, cleanFilename);
+    formData.append('filename', cleanFilename);
+
+    return firstValueFrom(
+      this.http.post<DocumentRecord>(this.endpoint, formData).pipe(
+        map((document) => this.normalizeDocument(document)),
+        timeout(30_000),
+      ),
+    );
+  }
+
+  create(request: DocumentCreateRequest | File): Promise<DocumentRecord> {
+    if (request instanceof File) {
+      return this.upload(request);
+    }
     return firstValueFrom(
       this.http.post<DocumentRecord>(this.endpoint, request).pipe(
         map((document) => this.normalizeDocument(document)),
         timeout(15_000),
+      ),
+    );
+  }
+
+  download(id: number): Promise<Blob> {
+    return firstValueFrom(
+      this.http.get(`${this.endpoint}/${id}/download`, { responseType: 'blob' }).pipe(
+        timeout(30_000),
       ),
     );
   }
