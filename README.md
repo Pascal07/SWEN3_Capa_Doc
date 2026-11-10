@@ -187,6 +187,7 @@ Configure the OCR Worker via environment variables in `.env` (or `OcrWorker/src/
 
 For the component relationships and message flow, see
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
+[`docs/OCR_WORKER.md`](docs/OCR_WORKER.md),
 [`docs/RUSTFS_OBJECT_STORAGE.md`](docs/RUSTFS_OBJECT_STORAGE.md), and
 [`docs/OAUTH2_GOOGLE_LOGIN.md`](docs/OAUTH2_GOOGLE_LOGIN.md).
 
