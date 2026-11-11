@@ -114,40 +114,6 @@ A Document Management System (DMS) designed for archiving documents with automat
 
 ---
 
-## 🔄 End-to-End Architecture (`Upload -> RustFS -> OCR-Queue -> OCR-Worker -> Indexing-Queue -> Indexing-Worker -> Elasticsearch -> Status-Queue -> REST-Server -> PostgreSQL`)
-
-> [!IMPORTANT]
-> **Strict Database Isolation:** **Only the REST-Server (`CapaDocAPI`) has a connection to PostgreSQL.** Neither `OcrWorker` nor `IndexWorker` has database drivers, `DataSource` configurations, or direct database access. Instead, all workers publish `DocumentStatusEvent` messages (`stage = OCR | INDEXING`, `status = IN_PROGRESS | DONE | FAILED`, optional `errorMessage`, `timestamp`) to the **`document.status`** queue, which `CapaDocAPI` consumes to update `ocrStatus` and `indexStatus` in PostgreSQL idempotently and regression-safely.
-
-```mermaid
-flowchart LR
-    Client["Frontend / Client\n(http://localhost/)"] -->|"1. POST /documents (PDF)"| API["CapaDocAPI\n(REST-Server)"]
-    API -->|"2. Upload PDF (storageKey)"| RustFS[("RustFS Bucket\n(documents)")]
-    API -->|"3. Save Metadata\n(ocrStatus=PENDING,\nindexStatus=PENDING)"| DB[("PostgreSQL\n(Only accessed by API)")]
-    API -->|"4. OcrMessage"| OcrQ[["RabbitMQ\nocr.queue"]]
-    OcrQ -->|"5. Consume OcrMessage"| OcrWorker["OcrWorker\n(Ghostscript + Tesseract)"]
-    OcrWorker -->|"6. Download PDF"| RustFS
-    OcrWorker -->|"7. IndexingMessage\n(documentId, filename, extractedText)"| IdxQ[["RabbitMQ\nindexing.queue"]]
-    OcrWorker -->|"8. DocumentStatusEvent\n(stage=OCR, IN_PROGRESS/DONE/FAILED)"| StatusQ[["RabbitMQ\ndocument.status"]]
-    IdxQ -->|"9. Consume IndexingMessage"| IdxWorker["IndexWorker"]
-    IdxWorker -->|"10. Index Document\n(_id = documentId)"| ES[("Elasticsearch\n(index: documents)")]
-    IdxWorker -->|"11. DocumentStatusEvent\n(stage=INDEXING, IN_PROGRESS/DONE/FAILED)"| StatusQ
-    StatusQ -->|"12. Consume StatusEvent\n(idempotent & regression-safe)"| API
-    API -->|"13. Update ocrStatus / indexStatus"| DB
-    Client -->|"14. GET /documents/search?q=..."| API
-    API -->|"15. multi_match Query"| ES
-    API -.->|"DELETE /documents/{id}\n(operation=DELETE)"| IdxQ
-```
-
-1. **Upload & Storage (`POST /documents` / `POST /api/documents`):** `CapaDocAPI` validates the uploaded PDF (`application/pdf`, max 10 MB), stores the binary in **RustFS** (`documents/<id>.pdf`), saves metadata with `ocrStatus = PENDING` and `indexStatus = PENDING` in **PostgreSQL**, and publishes an `OcrMessage` to `ocr.queue`.
-2. **OCR Processing (`OcrWorker`):** `OcrWorker` consumes `OcrMessage`, emits `DocumentStatusEvent(stage=OCR, status=IN_PROGRESS)` to `document.status`, downloads the PDF from RustFS, converts pages to PNG via **Ghostscript** (`300 DPI`), and extracts text via **Tesseract OCR** (`deu+eng`).On success, it **first** publishes `IndexingMessage` (`documentId`, `storageKey`, `filename`, `extractedText`, `uploadedAt`, `processedAt`) to `indexing.queue` and **then** emits `DocumentStatusEvent(stage=OCR, status=DONE)` to `document.status`. On error, it emits `DocumentStatusEvent(stage=OCR, status=FAILED, errorMessage=...)`.
-3. **Indexing (`IndexWorker`):** `IndexWorker` consumes `IndexingMessage` from `indexing.queue`, emits `DocumentStatusEvent(stage=INDEXING, status=IN_PROGRESS)`, indexes the document into the **Elasticsearch** index `documents` using `_id = documentId`, and **then** emits `DocumentStatusEvent(stage=INDEXING, status=DONE)` to `document.status` (or `FAILED` with `errorMessage` on failure).
-4. **Status Persistence (`CapaDocAPI`):** `DocumentStatusListener` in `CapaDocAPI` consumes `DocumentStatusEvent` from `document.status` and delegates to `DocumentStatusServiceImpl` (`@Transactional`). A status already marked `DONE` is never downgraded by delayed `IN_PROGRESS` or `FAILED` events; events for deleted documents are logged and acknowledged; malformed messages are routed to `document.status.dlq`.
-5. **Full-Text Search (`GET /documents/search?q=...&page=0&size=20`):** `CapaDocAPI` executes a case-insensitive `multi_match` query (`fuzziness = AUTO`, fields `filename^2.0` and `content`) with snippet highlighting against Elasticsearch, loads the matching document entities from PostgreSQL in relevance order, skips stale IDs, and returns `DocumentResponseDTO` items.
-6. **Document Deletion (`DELETE /documents/{id}`):** `CapaDocAPI` deletes the PDF from RustFS and the metadata row from PostgreSQL, then publishes an `IndexingDeleteMessage` (`documentId`, `operation = "DELETE"`) to `indexing.queue`. `IndexWorker` removes the document from Elasticsearch idempotently.
-
----
-
 ## 🔎 Elasticsearch, Kibana & OpenSearch
 
 ### Elasticsearch Configuration (Dev Setup)
