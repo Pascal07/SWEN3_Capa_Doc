@@ -26,6 +26,9 @@ public class DocumentResponseDTO {
     private ProcessingStatus indexStatus;
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String errorMessage;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String snippet;
 
 }

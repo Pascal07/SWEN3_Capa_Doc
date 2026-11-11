@@ -8,4 +8,8 @@ public interface DocumentMessagePublisher {
     default void publishDeleteIndexMessage(Long documentId) {
         // default no-op for backward compatibility
     }
+
+    default void publishInvalidStatusEventToDlq(Object invalidPayload) {
+        // default no-op for backward compatibility
+    }
 }

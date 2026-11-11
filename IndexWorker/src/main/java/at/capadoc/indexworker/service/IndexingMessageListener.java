@@ -4,7 +4,6 @@ import at.capadoc.indexworker.config.ElasticsearchProperties;
 import at.capadoc.indexworker.exception.IndexingPermanentException;
 import at.capadoc.indexworker.exception.IndexingTransientException;
 import at.capadoc.indexworker.model.IndexingMessage;
-import at.capadoc.indexworker.model.ProcessingStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,30 +16,33 @@ import java.time.LocalDateTime;
 public class IndexingMessageListener {
 
     private final DocumentIndexService documentIndexService;
-    private final DocumentStatusUpdater documentStatusUpdater;
+    private final StatusPublisher statusPublisher;
     private final IndexingDeadLetterPublisher deadLetterPublisher;
     private final ElasticsearchProperties properties;
 
     @Autowired
     public IndexingMessageListener(
             DocumentIndexService documentIndexService,
-            DocumentStatusUpdater documentStatusUpdater,
+            StatusPublisher statusPublisher,
             IndexingDeadLetterPublisher deadLetterPublisher,
             ElasticsearchProperties properties) {
         this.documentIndexService = documentIndexService;
-        this.documentStatusUpdater = documentStatusUpdater;
+        this.statusPublisher = statusPublisher;
         this.deadLetterPublisher = deadLetterPublisher;
         this.properties = properties;
     }
 
     public IndexingMessageListener(
             DocumentIndexService documentIndexService,
-            DocumentStatusUpdater documentStatusUpdater,
+            StatusPublisher statusPublisher,
             IndexingDeadLetterPublisher deadLetterPublisher) {
-        this(documentIndexService, documentStatusUpdater, deadLetterPublisher, new ElasticsearchProperties());
+        this(documentIndexService, statusPublisher, deadLetterPublisher, new ElasticsearchProperties());
     }
 
-    @RabbitListener(queues = "${capadoc.rabbitmq.indexing.queue:indexing.queue}")
+    @RabbitListener(
+            queues = "${capadoc.rabbitmq.indexing.queue:indexing.queue}",
+            autoStartup = "${spring.rabbitmq.listener.simple.auto-startup:true}"
+    )
     public void handleIndexingMessage(IndexingMessage message) {
         if (message == null || message.getDocumentId() == null) {
             log.error("Permanent indexing error: received invalid IndexingMessage without documentId; ignoring without retry.");
@@ -56,13 +58,17 @@ public class IndexingMessageListener {
 
         if (message.getFilename() == null || message.getFilename().isBlank()) {
             log.error("Permanent indexing error for documentId={}: filename is missing or blank (no retry).", documentId);
-            markFailed(documentId);
+            markFailed(documentId, "Indexing message filename is missing or blank");
             return;
         }
 
         int textLength = message.getExtractedText() != null ? message.getExtractedText().length() : 0;
         log.info("Received indexing message: documentId={}, filename={}, textLength={}",
                 documentId, message.getFilename(), textLength);
+
+        if (statusPublisher != null) {
+            statusPublisher.publishInProgress(documentId);
+        }
 
         LocalDateTime uploadedAt = resolveUploadedAt(message);
 
@@ -71,6 +77,7 @@ public class IndexingMessageListener {
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
+                // Reihenfolge im Erfolgsfall: Erst in Elasticsearch indexieren, dann DONE melden
                 documentIndexService.indexDocument(
                         documentId,
                         message.getFilename(),
@@ -78,15 +85,15 @@ public class IndexingMessageListener {
                         uploadedAt
                 );
 
-                if (documentStatusUpdater != null) {
-                    documentStatusUpdater.updateIndexStatus(documentId, ProcessingStatus.DONE);
+                if (statusPublisher != null) {
+                    statusPublisher.publishDone(documentId);
                 }
-                log.info("Successfully indexed documentId={} and updated indexStatus=DONE.", documentId);
+                log.info("Successfully indexed documentId={} and published indexStatus=DONE event.", documentId);
                 return;
             } catch (IndexingPermanentException ex) {
                 log.error("Permanent indexing failure for documentId={} (no retry): {}",
                         documentId, ex.getMessage());
-                markFailed(documentId);
+                markFailed(documentId, ex.getMessage());
                 return;
             } catch (IndexingTransientException ex) {
                 log.warn("Transient indexing error on attempt {}/{} for documentId={}: {}",
@@ -94,7 +101,7 @@ public class IndexingMessageListener {
                 if (attempt == maxAttempts) {
                     log.error("Exhausted all {} retry attempts for documentId={}; marking indexStatus=FAILED and sending to DLQ.",
                             maxAttempts, documentId, ex);
-                    markFailed(documentId);
+                    markFailed(documentId, ex.getMessage());
                     if (deadLetterPublisher != null) {
                         deadLetterPublisher.publishToDeadLetterQueue(message);
                     }
@@ -103,7 +110,7 @@ public class IndexingMessageListener {
                 sleepBackoff(backoffMs * (1L << (attempt - 1)), documentId);
             } catch (Exception ex) {
                 log.error("Unexpected error while indexing documentId={}", documentId, ex);
-                markFailed(documentId);
+                markFailed(documentId, ex.getMessage());
                 return;
             }
         }
@@ -147,21 +154,18 @@ public class IndexingMessageListener {
         if (message.getUploadedAt() != null) {
             return message.getUploadedAt();
         }
-        if (documentStatusUpdater != null) {
-            var fromDb = documentStatusUpdater.getUploadedAt(message.getDocumentId());
-            if (fromDb.isPresent()) {
-                return fromDb.get();
-            }
-        }
         if (message.getProcessedAt() != null) {
             return message.getProcessedAt();
         }
         return LocalDateTime.now();
     }
 
-    private void markFailed(Long documentId) {
-        if (documentStatusUpdater != null) {
-            documentStatusUpdater.updateIndexStatus(documentId, ProcessingStatus.FAILED);
+    private void markFailed(Long documentId, String errorMessage) {
+        if (statusPublisher != null) {
+            String safeMessage = (errorMessage != null && !errorMessage.isBlank())
+                    ? errorMessage
+                    : "Indexing failed";
+            statusPublisher.publishFailed(documentId, safeMessage);
         }
     }
 

@@ -19,5 +19,6 @@ public interface DocumentMapper {
     @Mapping(target = "storageKey", ignore = true)
     @Mapping(target = "ocrStatus", ignore = true)
     @Mapping(target = "indexStatus", ignore = true)
+    @Mapping(target = "errorMessage", ignore = true)
     DocumentEntity toEntity(DocumentRequestDTO dto);
 }

@@ -7,14 +7,12 @@ import at.capadoc.ocrworker.exception.StorageException;
 import at.capadoc.ocrworker.exception.StorageObjectNotFoundException;
 import at.capadoc.ocrworker.model.IndexingMessage;
 import at.capadoc.ocrworker.model.OcrMessage;
-import at.capadoc.ocrworker.model.ProcessingStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -23,7 +21,7 @@ public class OcrMessageListener {
     private final StorageService storageService;
     private final OcrService ocrService;
     private final IndexingMessagePublisher indexingMessagePublisher;
-    private final DocumentStatusUpdater documentStatusUpdater;
+    private final StatusPublisher statusPublisher;
     private final OcrProperties ocrProperties;
 
     @Autowired
@@ -31,12 +29,12 @@ public class OcrMessageListener {
             StorageService storageService,
             OcrService ocrService,
             IndexingMessagePublisher indexingMessagePublisher,
-            DocumentStatusUpdater documentStatusUpdater,
+            StatusPublisher statusPublisher,
             OcrProperties ocrProperties) {
         this.storageService = storageService;
         this.ocrService = ocrService;
         this.indexingMessagePublisher = indexingMessagePublisher;
-        this.documentStatusUpdater = documentStatusUpdater;
+        this.statusPublisher = statusPublisher;
         this.ocrProperties = ocrProperties;
     }
 
@@ -44,15 +42,18 @@ public class OcrMessageListener {
             StorageService storageService,
             OcrService ocrService,
             IndexingMessagePublisher indexingMessagePublisher,
-            DocumentStatusUpdater documentStatusUpdater) {
-        this(storageService, ocrService, indexingMessagePublisher, documentStatusUpdater, new OcrProperties());
+            StatusPublisher statusPublisher) {
+        this(storageService, ocrService, indexingMessagePublisher, statusPublisher, new OcrProperties());
     }
 
     public OcrMessageListener() {
         this(null, null, null, null, new OcrProperties());
     }
 
-    @RabbitListener(queues = "${capadoc.rabbitmq.queue}")
+    @RabbitListener(
+            queues = "${capadoc.rabbitmq.queue}",
+            autoStartup = "${spring.rabbitmq.listener.simple.auto-startup:true}"
+    )
     public void handleOcrMessage(OcrMessage message) {
         if (message == null || message.getDocumentId() == null) {
             log.warn("Received invalid OCR message without documentId; ignoring.");
@@ -74,14 +75,8 @@ public class OcrMessageListener {
             return;
         }
 
-        // Idempotenz-Prüfung: Bereits erfolgreich verarbeitete Dokumente nicht erneut verarbeiten
-        if (documentStatusUpdater != null) {
-            Optional<ProcessingStatus> currentStatus = documentStatusUpdater.getOcrStatus(documentId);
-            if (currentStatus.isPresent() && currentStatus.get() == ProcessingStatus.DONE) {
-                log.info("Document documentId={} already has ocrStatus=DONE; skipping duplicate OCR message idempotently.",
-                        documentId);
-                return;
-            }
+        if (statusPublisher != null) {
+            statusPublisher.publishInProgress(documentId);
         }
 
         int maxAttempts = Math.max(1, ocrProperties != null ? ocrProperties.getMaxRetries() : 3);
@@ -95,25 +90,27 @@ public class OcrMessageListener {
                 log.info("OCR completed for documentId={} (extracted {} characters)",
                         documentId, extractedText != null ? extractedText.length() : 0);
 
-                if (documentStatusUpdater != null) {
-                    documentStatusUpdater.updateOcrStatus(documentId, ProcessingStatus.DONE);
-                }
-
+                // Reihenfolge im Erfolgsfall: Erst Folgenachricht an Indexing-Queue senden, dann DONE melden
                 if (indexingMessagePublisher != null) {
                     IndexingMessage indexingMessage = IndexingMessage.builder()
                             .documentId(documentId)
                             .storageKey(storageKey)
                             .filename(message.getFilename())
                             .extractedText(extractedText != null ? extractedText : "")
+                            .uploadedAt(message.getUploadedAt())
                             .processedAt(LocalDateTime.now())
                             .build();
                     indexingMessagePublisher.publishIndexingMessage(indexingMessage);
+                }
+
+                if (statusPublisher != null) {
+                    statusPublisher.publishDone(documentId);
                 }
                 return;
             } catch (StorageObjectNotFoundException | OcrPermanentException ex) {
                 log.error("Permanent OCR failure for documentId={}, storageKey={} (no retry): {}",
                         documentId, storageKey, ex.getMessage());
-                markFailed(documentId);
+                markFailed(documentId, ex.getMessage());
                 return;
             } catch (OcrTransientException | StorageException ex) {
                 log.warn("Transient OCR error on attempt {}/{} for documentId={}, storageKey={}: {}",
@@ -121,7 +118,7 @@ public class OcrMessageListener {
                 if (attempt == maxAttempts) {
                     log.error("Exhausted all {} retry attempts for documentId={}; marking FAILED and sending to DLQ.",
                             maxAttempts, documentId, ex);
-                    markFailed(documentId);
+                    markFailed(documentId, ex.getMessage());
                     if (indexingMessagePublisher != null) {
                         indexingMessagePublisher.publishToDeadLetterQueue(message);
                     }
@@ -131,15 +128,18 @@ public class OcrMessageListener {
             } catch (Exception ex) {
                 log.error("Unexpected error while processing OCR for documentId={}, storageKey={}",
                         documentId, storageKey, ex);
-                markFailed(documentId);
+                markFailed(documentId, ex.getMessage());
                 return;
             }
         }
     }
 
-    private void markFailed(Long documentId) {
-        if (documentStatusUpdater != null) {
-            documentStatusUpdater.updateOcrStatus(documentId, ProcessingStatus.FAILED);
+    private void markFailed(Long documentId, String errorMessage) {
+        if (statusPublisher != null) {
+            String safeMessage = (errorMessage != null && !errorMessage.isBlank())
+                    ? errorMessage
+                    : "OCR processing failed";
+            statusPublisher.publishFailed(documentId, safeMessage);
         }
     }
 

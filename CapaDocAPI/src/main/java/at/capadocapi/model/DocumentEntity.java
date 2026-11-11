@@ -43,6 +43,9 @@ public class DocumentEntity {
     @Column(name = "index_status", columnDefinition = "varchar(32) default 'PENDING'")
     private ProcessingStatus indexStatus = ProcessingStatus.PENDING;
 
+    @Column(name = "error_message", length = 512)
+    private String errorMessage;
+
     // m:n relation to ShareLink – owning side lives here
     @Builder.Default
     @ToString.Exclude

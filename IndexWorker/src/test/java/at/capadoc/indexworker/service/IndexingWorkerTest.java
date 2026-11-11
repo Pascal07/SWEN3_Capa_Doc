@@ -2,8 +2,10 @@ package at.capadoc.indexworker.service;
 
 import at.capadoc.indexworker.config.ElasticsearchIndexInitializer;
 import at.capadoc.indexworker.config.ElasticsearchProperties;
+import at.capadoc.indexworker.model.DocumentStatusEvent;
 import at.capadoc.indexworker.model.IndexedDocument;
 import at.capadoc.indexworker.model.IndexingMessage;
+import at.capadoc.indexworker.model.ProcessingStage;
 import at.capadoc.indexworker.model.ProcessingStatus;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
@@ -24,12 +26,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,11 +49,12 @@ class IndexingWorkerTest {
     private ElasticsearchIndicesClient indicesClient;
 
     @Mock
-    private DocumentStatusUpdater documentStatusUpdater;
+    private RabbitTemplate rabbitTemplate;
 
     @Mock
     private IndexingDeadLetterPublisher deadLetterPublisher;
 
+    private StatusPublisher statusPublisher;
     private ElasticsearchProperties properties;
     private ElasticsearchIndexService indexService;
     private IndexingMessageListener listener;
@@ -64,31 +69,42 @@ class IndexingWorkerTest {
         properties.setMaxRetries(2);
         properties.setRetryDelayMs(5L);
 
+        statusPublisher = spy(new RabbitMqStatusPublisher(
+                rabbitTemplate,
+                "document.status.exchange",
+                "document.status.routingkey"
+        ));
+
         indexService = new ElasticsearchIndexService(elasticsearchClient, properties);
         listener = new IndexingMessageListener(
                 indexService,
-                documentStatusUpdater,
+                statusPublisher,
                 deadLetterPublisher,
                 properties
         );
     }
 
     @Test
-    void indexDocument_success_indexesWithDocumentIdAndUpdatesStatusToDone() throws Exception {
+    void indexDocument_success_indexesInElasticsearchBeforePublishingDoneStatusEvent() throws Exception {
         IndexingMessage message = IndexingMessage.builder()
                 .documentId(42L)
                 .storageKey("documents/42.pdf")
                 .filename("HelloWorld.pdf")
                 .extractedText("Hello World OCR content")
+                .uploadedAt(LocalDateTime.of(2026, 11, 11, 11, 59))
                 .processedAt(LocalDateTime.of(2026, 11, 11, 12, 0))
                 .build();
 
-        when(documentStatusUpdater.getUploadedAt(42L))
-                .thenReturn(Optional.of(LocalDateTime.of(2026, 11, 11, 11, 59)));
         when(elasticsearchClient.index(any(IndexRequest.class)))
                 .thenReturn(mockIndexResponse("42", Result.Created));
 
         listener.handleIndexingMessage(message);
+
+        // Verify strict order: IN_PROGRESS -> elasticsearchClient.index -> DONE
+        InOrder inOrder = inOrder(statusPublisher, elasticsearchClient);
+        inOrder.verify(statusPublisher).publishInProgress(42L);
+        inOrder.verify(elasticsearchClient).index(any(IndexRequest.class));
+        inOrder.verify(statusPublisher).publishDone(42L);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<IndexRequest<IndexedDocument>> captor = ArgumentCaptor.forClass(IndexRequest.class);
@@ -103,7 +119,25 @@ class IndexingWorkerTest {
         assertThat(request.document().getContent()).isEqualTo("Hello World OCR content");
         assertThat(request.document().getUploadedAt()).isEqualTo("2026-11-11T11:59:00Z");
 
-        verify(documentStatusUpdater).updateIndexStatus(42L, ProcessingStatus.DONE);
+        ArgumentCaptor<DocumentStatusEvent> statusCaptor = ArgumentCaptor.forClass(DocumentStatusEvent.class);
+        verify(rabbitTemplate, times(2)).convertAndSend(
+                eq("document.status.exchange"),
+                eq("document.status.routingkey"),
+                statusCaptor.capture()
+        );
+
+        List<DocumentStatusEvent> events = statusCaptor.getAllValues();
+        assertThat(events).hasSize(2);
+        assertThat(events.get(0).getDocumentId()).isEqualTo(42L);
+        assertThat(events.get(0).getStage()).isEqualTo(ProcessingStage.INDEXING);
+        assertThat(events.get(0).getStatus()).isEqualTo(ProcessingStatus.IN_PROGRESS);
+
+        assertThat(events.get(1).getDocumentId()).isEqualTo(42L);
+        assertThat(events.get(1).getStage()).isEqualTo(ProcessingStage.INDEXING);
+        assertThat(events.get(1).getStatus()).isEqualTo(ProcessingStatus.DONE);
+        assertThat(events.get(1).getErrorMessage()).isNull();
+        assertThat(events.get(1).getTimestamp()).isNotNull();
+
         verify(deadLetterPublisher, never()).publishToDeadLetterQueue(any());
     }
 
@@ -139,7 +173,7 @@ class IndexingWorkerTest {
         assertThat(captor.getAllValues().get(1).id()).isEqualTo("77");
         assertThat(captor.getAllValues().get(1).document().getContent()).isEqualTo("Version 2 updated");
 
-        verify(documentStatusUpdater, times(2)).updateIndexStatus(77L, ProcessingStatus.DONE);
+        verify(statusPublisher, times(2)).publishDone(77L);
     }
 
     @Test
@@ -156,6 +190,7 @@ class IndexingWorkerTest {
         assertThat(captor.getValue().index()).isEqualTo("documents");
         assertThat(captor.getValue().id()).isEqualTo("15");
         verify(deadLetterPublisher, never()).publishToDeadLetterQueue(any());
+        verify(statusPublisher, never()).publishStatus(any());
     }
 
     @Test
@@ -169,7 +204,7 @@ class IndexingWorkerTest {
 
         verify(elasticsearchClient, times(1)).delete(any(DeleteRequest.class));
         verify(deadLetterPublisher, never()).publishToDeadLetterQueue(any());
-        verify(documentStatusUpdater, never()).updateIndexStatus(anyLong(), any());
+        verify(statusPublisher, never()).publishStatus(any());
     }
 
     @Test
@@ -188,7 +223,7 @@ class IndexingWorkerTest {
     }
 
     @Test
-    void indexDocument_whenElasticsearchUnreachable_retriesAndMarksFailedAndPublishesToDlq() throws Exception {
+    void indexDocument_whenElasticsearchUnreachable_retriesAndPublishesFailedStatusEventAndDlq() throws Exception {
         IndexingMessage message = IndexingMessage.builder()
                 .documentId(55L)
                 .filename("unreachable.pdf")
@@ -202,12 +237,26 @@ class IndexingWorkerTest {
         listener.handleIndexingMessage(message);
 
         verify(elasticsearchClient, times(3)).index(any(IndexRequest.class));
-        verify(documentStatusUpdater).updateIndexStatus(55L, ProcessingStatus.FAILED);
+        verify(statusPublisher, never()).publishDone(anyLong());
+
+        ArgumentCaptor<DocumentStatusEvent> statusCaptor = ArgumentCaptor.forClass(DocumentStatusEvent.class);
+        verify(rabbitTemplate, atLeastOnce()).convertAndSend(
+                eq("document.status.exchange"),
+                eq("document.status.routingkey"),
+                statusCaptor.capture()
+        );
+
+        DocumentStatusEvent failedEvent = statusCaptor.getAllValues().getLast();
+        assertThat(failedEvent.getDocumentId()).isEqualTo(55L);
+        assertThat(failedEvent.getStage()).isEqualTo(ProcessingStage.INDEXING);
+        assertThat(failedEvent.getStatus()).isEqualTo(ProcessingStatus.FAILED);
+        assertThat(failedEvent.getErrorMessage()).contains("Elasticsearch connection/timeout error while indexing documentId=55");
+
         verify(deadLetterPublisher).publishToDeadLetterQueue(message);
     }
 
     @Test
-    void indexDocument_whenInvalidMessageWithoutFilename_doesNotRetryAndMarksFailed() throws Exception {
+    void indexDocument_whenInvalidMessageWithoutFilename_doesNotRetryAndPublishesFailedStatusEvent() throws Exception {
         IndexingMessage invalidMsg = IndexingMessage.builder()
                 .documentId(66L)
                 .filename("   ")
@@ -217,7 +266,8 @@ class IndexingWorkerTest {
         listener.handleIndexingMessage(invalidMsg);
 
         verify(elasticsearchClient, never()).index(any(IndexRequest.class));
-        verify(documentStatusUpdater).updateIndexStatus(66L, ProcessingStatus.FAILED);
+        verify(statusPublisher, never()).publishDone(anyLong());
+        verify(statusPublisher).publishFailed(eq(66L), contains("filename is missing or blank"));
         verify(deadLetterPublisher, never()).publishToDeadLetterQueue(any());
     }
 

@@ -16,5 +16,15 @@ public class IndexingMessage {
     private String storageKey;
     private String filename;
     private String extractedText;
+    private LocalDateTime uploadedAt;
     private LocalDateTime processedAt;
+
+    public IndexingMessage(
+            Long documentId,
+            String storageKey,
+            String filename,
+            String extractedText,
+            LocalDateTime processedAt) {
+        this(documentId, storageKey, filename, extractedText, null, processedAt);
+    }
 }

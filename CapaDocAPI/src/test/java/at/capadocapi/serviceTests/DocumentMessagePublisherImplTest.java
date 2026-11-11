@@ -1,6 +1,8 @@
 package at.capadocapi.serviceTests;
 
 import at.capadocapi.exception.QueuePublishException;
+import at.capadocapi.model.ProcessingStage;
+import at.capadocapi.model.dto.DocumentStatusEvent;
 import at.capadocapi.model.dto.IndexingDeleteMessage;
 import at.capadocapi.model.dto.OcrMessage;
 import at.capadocapi.service.DocumentMessagePublisherImpl;
@@ -10,7 +12,6 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.time.LocalDateTime;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
@@ -54,6 +55,22 @@ class DocumentMessagePublisherImplTest {
                 "indexing.exchange",
                 "indexing.routingkey",
                 IndexingDeleteMessage.of(42L)
+        );
+    }
+
+    @Test
+    void publishInvalidStatusEventToDlq_sendsInvalidPayloadToStatusDlx() {
+        DocumentStatusEvent invalidEvent = DocumentStatusEvent.builder()
+                .documentId(null)
+                .stage(ProcessingStage.OCR)
+                .build();
+
+        publisher.publishInvalidStatusEventToDlq(invalidEvent);
+
+        verify(rabbitTemplate).convertAndSend(
+                "document.status.dlx",
+                "document.status.dlq.routingkey",
+                invalidEvent
         );
     }
 }
