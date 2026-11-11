@@ -15,5 +15,8 @@ public interface DocumentMapper {
     @Mapping(target = "uploadedAt", ignore = true)
     @Mapping(target = "shareLinks", ignore = true)
     @Mapping(target = "ownerSub", ignore = true)
+    @Mapping(target = "storageKey", ignore = true)
+    @Mapping(target = "ocrStatus", ignore = true)
+    @Mapping(target = "indexStatus", ignore = true)
     DocumentEntity toEntity(DocumentRequestDTO dto);
 }

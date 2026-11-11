@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TimeoutError } from 'rxjs';
 import { Navbar } from '../../components/navbar/navbar';
-import { DocumentCreateRequest, DocumentsApi, formatFileSize } from '../../data/documents-api';
+import { DocumentsApi, formatFileSize } from '../../data/documents-api';
 import { AuthService } from '../../services/auth/auth';
 
 @Component({
@@ -24,21 +24,6 @@ export class UploadPage {
   readonly validationMessage = signal('');
   readonly successMessage = signal('');
 
-  private readonly contentTypesByExtension: Record<string, string> = {
-    csv: 'text/csv',
-    doc: 'application/msword',
-    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    jpeg: 'image/jpeg',
-    jpg: 'image/jpeg',
-    pdf: 'application/pdf',
-    png: 'image/png',
-    ppt: 'application/vnd.ms-powerpoint',
-    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    txt: 'text/plain',
-    xls: 'application/vnd.ms-excel',
-    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  };
-
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0] ?? null;
@@ -55,14 +40,9 @@ export class UploadPage {
       return;
     }
 
-    const expectedContentType = this.contentTypesByExtension[this.fileExtension(file.name)];
-    if (!expectedContentType) {
-      this.validationMessage.set('Dieser Dateityp wird nicht unterstützt.');
-      input.value = '';
-      return;
-    }
-    if (file.type && file.type !== 'application/octet-stream' && file.type !== expectedContentType) {
-      this.validationMessage.set('Der Dateityp passt nicht zur Dateiendung.');
+    const ext = this.fileExtension(file.name);
+    if (ext !== 'pdf' || (file.type && file.type !== 'application/octet-stream' && file.type !== 'application/pdf')) {
+      this.validationMessage.set('Es werden nur PDF-Dateien (.pdf) unterstützt.');
       input.value = '';
       return;
     }
@@ -76,29 +56,27 @@ export class UploadPage {
     this.successMessage.set('');
 
     const file = this.selectedFile();
-    const request: DocumentCreateRequest | null = file
-      ? {
-          filename: file.name.trim(),
-          contentType: this.getContentType(file),
-          sizeBytes: file.size,
-        }
-      : null;
-
-    if (!request || !request.filename || !request.contentType || request.sizeBytes <= 0) {
-      this.validationMessage.set('Bitte wähle eine gültige Datei aus.');
+    if (!file || !file.name.trim() || file.size <= 0) {
+      this.validationMessage.set('Bitte wähle eine gültige PDF-Datei aus.');
       return;
     }
 
     this.isSubmitting.set(true);
 
     try {
-      await this.documentsApi.create(request);
+      const created = await this.documentsApi.upload(file, file.name.trim());
       this.selectedFile.set(null);
       fileInput.value = '';
-      this.successMessage.set('Dokument wurde hinzugefügt.');
+      this.successMessage.set(
+        `Dokument "${created.filename}" wurde hochgeladen und in RustFS gespeichert (${created.storageKey ?? 'documents/' + created.id + '.pdf'}).`,
+      );
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 401) {
         this.errorMessage.set('Bitte melde dich an, um Dokumente hochzuladen.');
+      } else if (error instanceof HttpErrorResponse && error.status === 413) {
+        this.errorMessage.set('Die Datei überschreitet die maximal erlaubte Dateigröße.');
+      } else if (error instanceof HttpErrorResponse && error.status === 400) {
+        this.errorMessage.set(error.error?.message ?? 'Ungültige PDF-Datei.');
       } else if (error instanceof HttpErrorResponse && error.status === 0) {
         this.errorMessage.set('Die Verbindung zum Backend ist fehlgeschlagen. Bitte prüfe, ob das Backend läuft.');
       } else if (error instanceof TimeoutError) {
@@ -118,7 +96,7 @@ export class UploadPage {
   }
 
   getContentType(file: File): string {
-    return this.contentTypesByExtension[this.fileExtension(file.name)] ?? file.type;
+    return file.type || 'application/pdf';
   }
 
   private fileExtension(filename: string): string {

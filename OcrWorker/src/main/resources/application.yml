@@ -1,0 +1,33 @@
+ocr:
+  languages: ${OCR_LANGUAGES:deu+eng}
+  dpi: ${OCR_DPI:300}
+  timeoutPerPage: ${OCR_TIMEOUT_PER_PAGE:30s}
+  tesseractCommand: ${OCR_TESSERACT_COMMAND:tesseract}
+  ghostscriptCommand: ${OCR_GHOSTSCRIPT_COMMAND:gs}
+  tempDir: ${OCR_TEMP_DIR:}
+  maxPages: ${OCR_MAX_PAGES:100}
+  maxPdfSizeBytes: ${OCR_MAX_PDF_SIZE_BYTES:20971520}
+  maxRetries: ${OCR_MAX_RETRIES:3}
+  retryBackoffMs: ${OCR_RETRY_BACKOFF_MS:500}
+
+storage:
+  rustfs:
+    endpoint: ${RUSTFS_ENDPOINT:http://localhost:9000}
+    accessKey: ${RUSTFS_ACCESS_KEY:}
+    secretKey: ${RUSTFS_SECRET_KEY:}
+    bucket: ${RUSTFS_BUCKET:documents}
+    region: ${RUSTFS_REGION:us-east-1}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+storage:
+  rustfs:
+    endpoint: ${RUSTFS_ENDPOINT:http://rustfs:9000}
+    accessKey: ${RUSTFS_ACCESS_KEY:}
+    secretKey: ${RUSTFS_SECRET_KEY:}
+    bucket: ${RUSTFS_BUCKET:documents}
+    region: ${RUSTFS_REGION:us-east-1}

@@ -34,6 +34,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # --- RustFS Object Storage (S3-kompatibel) ---
+  rustfs:
+    image: rustfs/rustfs:1.0.4
+    container_name: capadoc-rustfs
+    restart: unless-stopped
+    ports:
+      - "9000:9000" # S3-API
+      - "9001:9001" # Console
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+      RUSTFS_CONSOLE_ENABLE: "true"
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # --- OCR Worker ---
   ocr-worker:
     build:
@@ -42,12 +62,26 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RUSTFS_ENDPOINT: http://rustfs:9000
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-documents}
+      RUSTFS_REGION: ${RUSTFS_REGION:-us-east-1}
+      OCR_LANGUAGES: ${OCR_LANGUAGES:-deu+eng}
+      OCR_DPI: ${OCR_DPI:-300}
     depends_on:
+      db:
+        condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      rustfs:
         condition: service_healthy
 
   # --- Spring Boot API ---
@@ -71,10 +105,18 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      # --- RustFS Object Storage ---
+      RUSTFS_ENDPOINT: http://rustfs:9000
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-documents}
+      RUSTFS_REGION: ${RUSTFS_REGION:-us-east-1}
     depends_on:
       db:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      rustfs:
         condition: service_healthy
 
   # --- Frontend ---
@@ -91,3 +133,4 @@ services:
 
 volumes:
   db-data:
+  rustfs-data:

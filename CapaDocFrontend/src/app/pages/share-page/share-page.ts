@@ -23,6 +23,7 @@ export class SharePage implements OnInit {
   readonly password = signal('');
   readonly document = signal<DocumentRecord | null>(null);
   readonly isSubmitting = signal(false);
+  readonly isDownloading = signal(false);
   readonly errorMessage = signal('');
 
   formatSize(sizeBytes: number): string {
@@ -61,6 +62,32 @@ export class SharePage implements OnInit {
       }
     } finally {
       this.isSubmitting.set(false);
+    }
+  }
+
+  async downloadSharedDocument(): Promise<void> {
+    const doc = this.document();
+    const shortCode = this.shortCode().trim();
+    const password = this.password();
+    if (!doc || !shortCode || !password) return;
+
+    this.errorMessage.set('');
+    this.isDownloading.set(true);
+
+    try {
+      const blob = await this.shareLinksApi.download(shortCode, password);
+      const url = window.URL.createObjectURL(blob);
+      const anchor = window.document.createElement('a');
+      anchor.href = url;
+      anchor.download = doc.filename || `document-${doc.id}.pdf`;
+      window.document.body.appendChild(anchor);
+      anchor.click();
+      window.document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(url);
+    } catch {
+      this.errorMessage.set('Die PDF-Datei konnte nicht heruntergeladen werden.');
+    } finally {
+      this.isDownloading.set(false);
     }
   }
 }

@@ -1,9 +1,8 @@
 import { DatePipe } from '@angular/common';
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { signal } from '@angular/core';
 import { TimeoutError } from 'rxjs';
 import { Navbar } from '../../components/navbar/navbar';
 import { DocumentCreateRequest, DocumentRecord, DocumentsApi, formatFileSize } from '../../data/documents-api';
@@ -25,6 +24,7 @@ export class Dashboard implements OnInit {
   readonly documents = signal<DocumentRecord[]>([]);
   readonly isLoading = signal(true);
   readonly deletingId = signal<number | null>(null);
+  readonly downloadingId = signal<number | null>(null);
   readonly editingDocument = signal<DocumentRecord | null>(null);
   readonly isUpdating = signal(false);
   readonly isLoadingDetails = signal(false);
@@ -65,6 +65,36 @@ export class Dashboard implements OnInit {
     }
   }
 
+  async downloadDocument(doc: DocumentRecord): Promise<void> {
+    this.errorMessage.set('');
+    this.detailError.set('');
+    this.downloadingId.set(doc.id);
+
+    try {
+      const blob = await this.documentsApi.download(doc.id);
+      const url = window.URL.createObjectURL(blob);
+      const anchor = window.document.createElement('a');
+      anchor.href = url;
+      anchor.download = doc.filename || `document-${doc.id}.pdf`;
+      window.document.body.appendChild(anchor);
+      anchor.click();
+      window.document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      const msg = this.getRequestErrorMessage(
+        error,
+        'Dokument konnte nicht aus RustFS heruntergeladen werden.',
+      );
+      if (this.editingDocument()) {
+        this.detailError.set(msg);
+      } else {
+        this.errorMessage.set(msg);
+      }
+    } finally {
+      this.downloadingId.set(null);
+    }
+  }
+
   async deleteDocument(document: DocumentRecord): Promise<void> {
     if (!window.confirm(`Möchtest du "${document.filename}" wirklich löschen?`)) return;
 
@@ -75,7 +105,10 @@ export class Dashboard implements OnInit {
     try {
       await this.documentsApi.delete(document.id);
       this.documents.update((items) => items.filter((item) => item.id !== document.id));
-      this.successMessage.set('Dokument wurde gelöscht.');
+      if (this.editingDocument()?.id === document.id) {
+        this.editingDocument.set(null);
+      }
+      this.successMessage.set('Dokument wurde aus Datenbank und RustFS gelöscht.');
     } catch (error) {
       this.errorMessage.set(this.getRequestErrorMessage(
         error,
@@ -104,8 +137,12 @@ export class Dashboard implements OnInit {
     this.isLoadingDetails.set(true);
 
     try {
-      const details = await this.documentsApi.get(document.id);
+      const [details, links] = await Promise.all([
+        this.documentsApi.get(document.id),
+        this.shareLinksApi.listForDocument(document.id),
+      ]);
       this.editingDocument.set(details);
+      this.shareLinks.set(links);
       this.editedFilename = this.filenameWithoutExtension(details.filename);
       this.filenameExtension.set(this.extensionOf(details.filename));
     } catch (error) {
@@ -186,7 +223,7 @@ export class Dashboard implements OnInit {
         password,
         expiryDate: this.shareExpiryDate,
       });
-      this.shareLinks.set([link, ...this.shareLinks()]);
+      this.shareLinks.set([link, ...this.shareLinks().filter((item) => item.id !== link.id)]);
       this.sharePassword = '';
       this.detailMessage.set('Share-Link wurde erstellt.');
     } catch (error) {
@@ -222,7 +259,7 @@ export class Dashboard implements OnInit {
       await navigator.clipboard.writeText(this.shareLinkUrl(link));
       this.detailMessage.set('Share-Link wurde kopiert.');
       this.detailError.set('');
-    } catch (error) {
+    } catch {
       this.detailError.set('Der Share-Link konnte nicht in die Zwischenablage kopiert werden.');
     }
   }
@@ -261,6 +298,9 @@ export class Dashboard implements OnInit {
       }
       if (error.status === 408) {
         return 'Das Backend antwortet nicht. Bitte versuche es erneut.';
+      }
+      if (error.status === 404) {
+        return 'Die Datei wurde im Speicher nicht gefunden.';
       }
     }
 

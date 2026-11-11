@@ -4,6 +4,10 @@ export interface DocumentRecord {
   contentType: string;
   sizeBytes: number;
   uploadedAt: string;
+  ownerSub?: string;
+  storageKey?: string;
+  ocrStatus?: string;
+  indexStatus?: string;
 }
 
 export interface DocumentCreateRequest {
@@ -36,7 +40,9 @@ export function formatFileSize(sizeBytes: number): string {
 export abstract class DocumentsApi {
   abstract list(): Promise<DocumentRecord[]>;
   abstract get(id: number): Promise<DocumentRecord>;
-  abstract create(request: DocumentCreateRequest): Promise<DocumentRecord>;
+  abstract upload(file: File, filename?: string): Promise<DocumentRecord>;
+  abstract create(request: DocumentCreateRequest | File): Promise<DocumentRecord>;
+  abstract download(id: number): Promise<Blob>;
   abstract update(id: number, request: DocumentCreateRequest): Promise<DocumentRecord>;
   abstract delete(id: number): Promise<void>;
 }

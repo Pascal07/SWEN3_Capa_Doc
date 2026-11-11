@@ -1,19 +1,25 @@
 package at.capadocapi.controller;
 
-import at.capadocapi.mapper.DocumentMapper;
 import at.capadocapi.exception.DocumentNotFoundException;
+import at.capadocapi.mapper.DocumentMapper;
 import at.capadocapi.model.DocumentEntity;
 import at.capadocapi.model.dto.DocumentRequestDTO;
 import at.capadocapi.model.dto.DocumentResponseDTO;
+import at.capadocapi.service.DocumentServiceImpl;
 import at.capadocapi.service.Interfaces.DocumentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 
@@ -53,7 +59,69 @@ public class DocumentController {
         return ResponseEntity.ok(documentMapper.toResponseDto(document));
     }
 
-    @PostMapping
+    @GetMapping({"/{id}/download", "/{id}/file"})
+    public ResponseEntity<byte[]> downloadDocument(
+            @PathVariable Long id,
+            @AuthenticationPrincipal OidcUser user) {
+        Optional<DocumentEntity> documentOpt = documentService.getDocumentById(id);
+        if (documentOpt.isEmpty()) {
+            throw new DocumentNotFoundException(id);
+        }
+        DocumentEntity document = documentOpt.get();
+        if (isForbidden(document, user)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        byte[] content = documentService.downloadDocument(id);
+        String filename = (document.getFilename() != null && !document.getFilename().isBlank())
+                ? document.getFilename()
+                : "document-" + id + ".pdf";
+        String contentType = (document.getContentType() != null && !document.getContentType().isBlank())
+                ? document.getContentType()
+                : DocumentServiceImpl.PDF_CONTENT_TYPE;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(contentType));
+        headers.setContentLength(content.length);
+        headers.setContentDisposition(
+                ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build()
+        );
+
+        return new ResponseEntity<>(content, headers, HttpStatus.OK);
+    }
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<DocumentResponseDTO> uploadDocument(
+            @RequestPart("file") MultipartFile file,
+            @RequestPart(value = "metadata", required = false) @Valid DocumentRequestDTO metadata,
+            @RequestParam(value = "filename", required = false) String filenameParam,
+            @AuthenticationPrincipal OidcUser user) {
+        byte[] pdfBytes = DocumentServiceImpl.validateAndReadPdfFile(file);
+
+        DocumentEntity toCreate = (metadata != null)
+                ? documentMapper.toEntity(metadata)
+                : new DocumentEntity();
+
+        if (filenameParam != null && !filenameParam.isBlank()) {
+            toCreate.setFilename(filenameParam);
+        } else if (toCreate.getFilename() == null || toCreate.getFilename().isBlank()) {
+            String originalFilename = file.getOriginalFilename();
+            toCreate.setFilename(
+                    (originalFilename != null && !originalFilename.isBlank()) ? originalFilename : "document.pdf"
+            );
+        }
+        toCreate.setContentType(DocumentServiceImpl.PDF_CONTENT_TYPE);
+        toCreate.setSizeBytes((long) pdfBytes.length);
+
+        if (user != null) {
+            toCreate.setOwnerSub(user.getSubject());
+        }
+
+        DocumentEntity created = documentService.createDocument(toCreate, file);
+        return new ResponseEntity<>(documentMapper.toResponseDto(created), HttpStatus.CREATED);
+    }
+
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<DocumentResponseDTO> createDocument(
             @Valid @RequestBody DocumentRequestDTO request,
             @AuthenticationPrincipal OidcUser user) {
