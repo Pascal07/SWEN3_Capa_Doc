@@ -16,6 +16,16 @@ env:
   GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
   GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
   APP_BASE_URL: http://localhost:4200
+  RABBITMQ_USER: your_rabbitmq_user
+  RABBITMQ_PASSWORD: your_rabbitmq_password
+  RUSTFS_ACCESS_KEY: your_rustfs_access_key
+  RUSTFS_SECRET_KEY: your_rustfs_secret_key
+  RUSTFS_BUCKET: documents
+  RUSTFS_REGION: us-east-1
+  OCR_LANGUAGES: deu+eng
+  OCR_DPI: 300
+
+  
 
 jobs:
   build-and-smoke-test:
