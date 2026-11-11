@@ -54,6 +54,42 @@ services:
       timeout: 5s
       retries: 5
 
+  # --- Elasticsearch (Single-Node Dev Setup) ---
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.5
+    container_name: capadoc-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Kibana (Optional: docker compose --profile tools up) ---
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.4.5
+    container_name: capadoc-kibana
+    restart: unless-stopped
+    profiles:
+      - tools
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
   # --- OCR Worker ---
   ocr-worker:
     build:
@@ -84,6 +120,33 @@ services:
       rustfs:
         condition: service_healthy
 
+  # --- Indexing Worker ---
+  index-worker:
+    build:
+      context: ./IndexWorker
+    container_name: capadoc-index-worker
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      ELASTICSEARCH_INDEX: ${ELASTICSEARCH_INDEX:-documents}
+      ELASTICSEARCH_USERNAME: ${ELASTICSEARCH_USERNAME:-}
+      ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
   # --- Spring Boot API ---
   api:
     build:
@@ -111,12 +174,19 @@ services:
       RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
       RUSTFS_BUCKET: ${RUSTFS_BUCKET:-documents}
       RUSTFS_REGION: ${RUSTFS_REGION:-us-east-1}
+      # --- Elasticsearch ---
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      ELASTICSEARCH_INDEX: ${ELASTICSEARCH_INDEX:-documents}
+      ELASTICSEARCH_USERNAME: ${ELASTICSEARCH_USERNAME:-}
+      ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD:-}
     depends_on:
       db:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
       rustfs:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
 
   # --- Frontend ---
@@ -127,6 +197,7 @@ services:
     container_name: capadoc-frontend
     restart: unless-stopped
     ports:
+      - "80:80"
       - "4200:80"
     depends_on:
       - api
@@ -134,3 +205,4 @@ services:
 volumes:
   db-data:
   rustfs-data:
+  elasticsearch-data:

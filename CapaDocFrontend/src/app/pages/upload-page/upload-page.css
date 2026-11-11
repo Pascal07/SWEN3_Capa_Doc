@@ -82,9 +82,12 @@
   text-align: center;
 }
 
-.file-field:focus-within {
+.file-field:focus-within,
+.file-field--dragging {
   outline: 2px solid #557b61;
   outline-offset: 2px;
+  background: #eef5f0;
+  border-color: #456596;
 }
 
 .file-field__icon {
@@ -171,7 +174,19 @@
 }
 
 .message--success {
-  color: #355e3e;
+  border-color: #b7d7c0;
+  background: #f3faf5;
+  color: #265432;
+}
+
+.message--success p {
+  margin: 0;
+}
+
+.processing-hint {
+  margin-top: 0.45rem !important;
+  color: #3f6248;
+  font-size: 0.8rem;
 }
 
 button:focus-visible {

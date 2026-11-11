@@ -268,6 +268,7 @@ public class DocumentServiceImpl implements DocumentService {
             }
 
             documentRepository.deleteById(id);
+            publishDeleteIndexMessageAfterCommit(id);
         } catch (DataAccessException ex) {
             throw dataAccessException("Could not delete document " + id, ex);
         }
@@ -283,6 +284,22 @@ public class DocumentServiceImpl implements DocumentService {
             });
         } else {
             messagePublisher.publishOcrMessage(ocrMessage);
+        }
+    }
+
+    private void publishDeleteIndexMessageAfterCommit(Long documentId) {
+        if (messagePublisher == null) {
+            return;
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    messagePublisher.publishDeleteIndexMessage(documentId);
+                }
+            });
+        } else {
+            messagePublisher.publishDeleteIndexMessage(documentId);
         }
     }
 

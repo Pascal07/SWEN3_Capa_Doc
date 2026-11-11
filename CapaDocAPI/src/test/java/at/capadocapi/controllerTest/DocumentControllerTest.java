@@ -1,8 +1,11 @@
 package at.capadocapi.controllerTest;
 
+import at.capadocapi.exception.SearchServiceUnavailableException;
 import at.capadocapi.model.DocumentEntity;
 import at.capadocapi.model.ProcessingStatus;
 import at.capadocapi.model.dto.DocumentRequestDTO;
+import at.capadocapi.model.dto.DocumentResponseDTO;
+import at.capadocapi.service.Interfaces.DocumentSearchService;
 import at.capadocapi.service.Interfaces.DocumentService;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +46,9 @@ class DocumentControllerTest {
 
     @MockitoBean
     private DocumentService documentService;
+
+    @MockitoBean
+    private DocumentSearchService documentSearchService;
 
     private DocumentEntity sampleEntity;
     private DocumentRequestDTO validRequest;
@@ -433,5 +439,106 @@ class DocumentControllerTest {
                 .andExpect(content().bytes(pdfBytes));
 
         verify(documentService, times(1)).downloadDocument(1L);
+    }
+
+    // ---------- GET /api/documents/search & /documents/search ----------
+
+    @Test
+    void searchDocuments_returnsMatchingDocumentsInRelevanceOrder() throws Exception {
+        DocumentResponseDTO hit1 = DocumentResponseDTO.builder()
+                .id(20L)
+                .filename("HelloWorld.pdf")
+                .contentType("application/pdf")
+                .sizeBytes(4096L)
+                .uploadedAt(LocalDateTime.of(2026, 11, 11, 12, 0))
+                .ocrStatus(ProcessingStatus.DONE)
+                .indexStatus(ProcessingStatus.DONE)
+                .snippet("Hello World")
+                .build();
+
+        DocumentResponseDTO hit2 = DocumentResponseDTO.builder()
+                .id(10L)
+                .filename("OtherHello.pdf")
+                .contentType("application/pdf")
+                .sizeBytes(2048L)
+                .uploadedAt(LocalDateTime.of(2026, 11, 10, 10, 0))
+                .ocrStatus(ProcessingStatus.DONE)
+                .indexStatus(ProcessingStatus.DONE)
+                .snippet("Hello there")
+                .build();
+
+        when(documentSearchService.searchDocuments("Hello", 0, 20, "user"))
+                .thenReturn(List.of(hit1, hit2));
+
+        mockMvc.perform(get("/documents/search")
+                        .param("q", "Hello")
+                        .param("page", "0")
+                        .param("size", "20")
+                        .with(oidcLogin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(20))
+                .andExpect(jsonPath("$[0].filename").value("HelloWorld.pdf"))
+                .andExpect(jsonPath("$[0].snippet").value("Hello World"))
+                .andExpect(jsonPath("$[1].id").value(10))
+                .andExpect(jsonPath("$[1].filename").value("OtherHello.pdf"));
+
+        verify(documentSearchService).searchDocuments("Hello", 0, 20, "user");
+    }
+
+    @Test
+    void searchDocuments_returnsEmptyList_whenNoMatches() throws Exception {
+        when(documentSearchService.searchDocuments("NonExistentTerm", 0, 20, "user"))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/documents/search")
+                        .param("q", "NonExistentTerm")
+                        .with(oidcLogin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void searchDocuments_returns400_whenQueryBlankOrMissing() throws Exception {
+        mockMvc.perform(get("/documents/search")
+                        .param("q", "   ")
+                        .with(oidcLogin()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Search query 'q' must not be blank"));
+
+        mockMvc.perform(get("/documents/search")
+                        .with(oidcLogin()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+
+        verifyNoInteractions(documentSearchService);
+    }
+
+    @Test
+    void searchDocuments_returns400_whenSizeTooLarge() throws Exception {
+        mockMvc.perform(get("/documents/search")
+                        .param("q", "Hello")
+                        .param("size", "500")
+                        .with(oidcLogin()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+
+        verifyNoInteractions(documentSearchService);
+    }
+
+    @Test
+    void searchDocuments_returns503_whenElasticsearchUnavailable() throws Exception {
+        when(documentSearchService.searchDocuments("Hello", 0, 20, "user"))
+                .thenThrow(new SearchServiceUnavailableException("ES unreachable"));
+
+        mockMvc.perform(get("/documents/search")
+                        .param("q", "Hello")
+                        .with(oidcLogin()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.error").value("Service Unavailable"))
+                .andExpect(jsonPath("$.message")
+                        .value("The search service is currently unavailable. Please try again later."));
     }
 }

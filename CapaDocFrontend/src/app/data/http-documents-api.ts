@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, map, timeout } from 'rxjs';
 import { DocumentCreateRequest, DocumentRecord, DocumentsApi, normalizeUploadedAt } from './documents-api';
@@ -11,6 +11,20 @@ export class HttpDocumentsApi extends DocumentsApi {
   list(): Promise<DocumentRecord[]> {
     return firstValueFrom(
       this.http.get<DocumentRecord[]>(this.endpoint).pipe(
+        map((documents) => documents.map((document) => this.normalizeDocument(document))),
+        timeout(15_000),
+      ),
+    );
+  }
+
+  search(query: string, page = 0, size = 20): Promise<DocumentRecord[]> {
+    const params = new HttpParams()
+      .set('q', query)
+      .set('page', String(page))
+      .set('size', String(size));
+
+    return firstValueFrom(
+      this.http.get<DocumentRecord[]>(`${this.endpoint}/search`, { params }).pipe(
         map((documents) => documents.map((document) => this.normalizeDocument(document))),
         timeout(15_000),
       ),

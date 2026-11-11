@@ -1,6 +1,7 @@
 package at.capadocapi.model.dto;
 
 import at.capadocapi.model.ProcessingStatus;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,5 +24,8 @@ public class DocumentResponseDTO {
     private String storageKey;
     private ProcessingStatus ocrStatus;
     private ProcessingStatus indexStatus;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String snippet;
 
 }

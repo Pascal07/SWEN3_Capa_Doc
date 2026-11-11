@@ -1,6 +1,7 @@
 package at.capadocapi.serviceTests;
 
 import at.capadocapi.exception.QueuePublishException;
+import at.capadocapi.model.dto.IndexingDeleteMessage;
 import at.capadocapi.model.dto.OcrMessage;
 import at.capadocapi.service.DocumentMessagePublisherImpl;
 import org.junit.jupiter.api.Test;
@@ -43,5 +44,16 @@ class DocumentMessagePublisherImplTest {
 
     private OcrMessage message() {
         return new OcrMessage(12L, "report.pdf", "application/pdf", LocalDateTime.of(2026, 1, 1, 10, 0));
+    }
+
+    @Test
+    void publishDeleteIndexMessage_sendsDeleteEventToIndexingExchange() {
+        publisher.publishDeleteIndexMessage(42L);
+
+        verify(rabbitTemplate).convertAndSend(
+                "indexing.exchange",
+                "indexing.routingkey",
+                IndexingDeleteMessage.of(42L)
+        );
     }
 }

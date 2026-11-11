@@ -9,6 +9,7 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface DocumentMapper {
 
+    @Mapping(target = "snippet", ignore = true)
     DocumentResponseDTO toResponseDto(DocumentEntity entity);
 
     @Mapping(target = "id", ignore = true)

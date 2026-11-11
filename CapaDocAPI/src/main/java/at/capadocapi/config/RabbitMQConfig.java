@@ -30,6 +30,15 @@ public class RabbitMQConfig {
     @Value("${capadoc.rabbitmq.dlq.routingkey}")
     private String dlqRoutingKey;
 
+    @Value("${capadoc.rabbitmq.indexing.exchange:indexing.exchange}")
+    private String indexingExchangeName;
+
+    @Value("${capadoc.rabbitmq.indexing.queue:indexing.queue}")
+    private String indexingQueueName;
+
+    @Value("${capadoc.rabbitmq.indexing.routingkey:indexing.routingkey}")
+    private String indexingRoutingKey;
+
     // 1. Dead-Letter-Exchange & Queue (für fehlerhafte Nachrichten)
     @Bean
     public DirectExchange deadLetterExchange() {
@@ -63,6 +72,22 @@ public class RabbitMQConfig {
     @Bean
     public Binding ocrBinding(Queue ocrQueue, DirectExchange ocrExchange) {
         return BindingBuilder.bind(ocrQueue).to(ocrExchange).with(routingKey);
+    }
+
+    // 2b. Indexing-Exchange & Queue (für Indexierungs- und Lösch-Events)
+    @Bean
+    public DirectExchange indexingExchange() {
+        return new DirectExchange(indexingExchangeName);
+    }
+
+    @Bean
+    public Queue indexingQueue() {
+        return QueueBuilder.durable(indexingQueueName).build();
+    }
+
+    @Bean
+    public Binding indexingBinding(Queue indexingQueue, DirectExchange indexingExchange) {
+        return BindingBuilder.bind(indexingQueue).to(indexingExchange).with(indexingRoutingKey);
     }
 
     // 3. JSON Converter (damit OcrMessage als JSON übertragen wird)

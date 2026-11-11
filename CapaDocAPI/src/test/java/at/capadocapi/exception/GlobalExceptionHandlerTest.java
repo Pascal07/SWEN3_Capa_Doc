@@ -77,6 +77,17 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
+    @Test
+    void searchServiceFailure_returnsServiceUnavailableAndErrorDto() throws Exception {
+        mockMvc.perform(get("/test/search-failure"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.error").value("Service Unavailable"))
+                .andExpect(jsonPath("$.message")
+                        .value("The search service is currently unavailable. Please try again later."))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
     @RestController
     static class ExceptionThrowingController {
 
@@ -103,6 +114,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/storage-failure")
         void storageFailure() {
             throw new StorageException("S3 connection failed");
+        }
+
+        @GetMapping("/test/search-failure")
+        void searchFailure() {
+            throw new SearchServiceUnavailableException("Elasticsearch unreachable");
         }
     }
 }
