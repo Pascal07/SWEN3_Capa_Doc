@@ -9,6 +9,7 @@ import java.util.List;
 
 public interface ShareLinkService {
     public ShareLinkResponseDTO createShareLink(Long documentId, ShareLinkRequestDTO request);
+    public List<ShareLinkResponseDTO> getShareLinksForDocument(Long documentId);
     public List<DocumentResponseDTO> resolveLink(String shortCode, String password);
     public void deleteShareLink(Long id);
 }

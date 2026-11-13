@@ -5,7 +5,7 @@
       <div>
         <p class="upload-page__eyebrow">DOKUMENTENBIBLIOTHEK</p>
         <h1>Dokument hochladen</h1>
-        <p class="upload-page__subtitle">Füge eine Datei zu deinen Dokumenten hinzu.</p>
+        <p class="upload-page__subtitle">Füge eine PDF-Datei (max. 10 MB) zur OCR-Texterkennung und Volltextsuche hinzu.</p>
       </div>
     </header>
 
@@ -17,28 +17,43 @@
       </p>
     }
     @if (successMessage(); as success) {
-      <p class="message message--success" role="status">{{ success }}</p>
+      <div class="message message--success" role="status">
+        <p>{{ success }}</p>
+        @if (uploadedDocument(); as doc) {
+          <p class="processing-hint">
+            Verarbeitungsstatus: <strong>OCR: {{ doc.ocrStatus ?? 'PENDING' }}</strong> ·
+            <strong>Index: {{ doc.indexStatus ?? 'PENDING' }}</strong> —
+            Die Volltextsuche findet das Dokument automatisch, sobald OCR-Texterkennung und Indexierung im Hintergrund abgeschlossen sind.
+          </p>
+        }
+      </div>
     }
 
     <section class="upload-panel" aria-labelledby="upload-heading">
       <div class="panel-heading">
         <div>
-          <h2 id="upload-heading">Datei hinzufügen</h2>
-          <p>Wähle ein Dokument von deinem Gerät aus.</p>
+          <h2 id="upload-heading">PDF-Datei hinzufügen</h2>
+          <p>Wähle ein PDF von deinem Gerät aus oder ziehe es per Drag &amp; Drop in das Feld (max. 10 MB).</p>
         </div>
       </div>
 
       <form (ngSubmit)="createDocument(fileInput)">
-        <label class="file-field" for="document-file">
+        <label
+          class="file-field"
+          [class.file-field--dragging]="isDragging()"
+          for="document-file"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave($event)"
+          (drop)="onDrop($event, fileInput)">
           <span class="file-field__icon" aria-hidden="true">+</span>
-          <span class="file-field__label">Datei auswählen</span>
-          <span class="file-field__name">{{ selectedFile()?.name ?? 'Keine Datei ausgewählt' }}</span>
+          <span class="file-field__label">PDF-Datei auswählen oder hierher ziehen</span>
+          <span class="file-field__name">{{ selectedFile()?.name ?? 'Keine Datei ausgewählt (.pdf, max. 10 MB)' }}</span>
           <input
             #fileInput
             id="document-file"
             name="document"
             type="file"
-            accept=".csv,.doc,.docx,.jpeg,.jpg,.pdf,.png,.ppt,.pptx,.txt,.xls,.xlsx"
+            accept=".pdf,application/pdf"
             required
             (change)="onFileSelected($event)"
             [disabled]="isSubmitting()">
@@ -53,11 +68,11 @@
         }
 
         <button class="submit-button" type="submit" [disabled]="!selectedFile() || isSubmitting()">
-          {{ isSubmitting() ? 'Wird hinzugefügt ...' : 'Dokument hinzufügen' }}
+          {{ isSubmitting() ? 'PDF wird hochgeladen ...' : 'Dokument hinzufügen' }}
         </button>
       </form>
       @if (successMessage()) {
-        <a class="dashboard-link" routerLink="/dashboard">Zum Dashboard</a>
+        <a class="dashboard-link" routerLink="/dashboard">Zum Dashboard &amp; zur Volltextsuche</a>
       }
     </section>
   </div>

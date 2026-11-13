@@ -5,10 +5,14 @@
 			<div>
 				<p class="dashboard__eyebrow">DOKUMENTENBIBLIOTHEK</p>
 				<h1>Meine Dokumente</h1>
-				<p class="dashboard__subtitle">Deine Dateien an einem Ort.</p>
+				<p class="dashboard__subtitle">Deine Dateien an einem Ort – durchsuchbar per Volltextsuche.</p>
 			</div>
 			<div class="document-count" aria-label="Anzahl Dokumente">
-				{{ documents().length }} {{ documents().length === 1 ? 'Dokument' : 'Dokumente' }}
+				@if (isSearchActive()) {
+					{{ searchResults().length }} {{ searchResults().length === 1 ? 'Treffer' : 'Treffer' }}
+				} @else {
+					{{ documents().length }} {{ documents().length === 1 ? 'Dokument' : 'Dokumente' }}
+				}
 			</div>
 		</header>
 
@@ -29,19 +33,76 @@
 			<section class="documents-panel" aria-labelledby="documents-heading">
 				<div class="panel-heading">
 					<div>
-						<h2 id="documents-heading">Dokumente</h2>
-						<p>Zuletzt hinzugefügte Dateien</p>
+						<h2 id="documents-heading">
+							{{ isSearchActive() ? 'Suchergebnisse für „' + activeSearchQuery() + '“' : 'Dokumente' }}
+						</h2>
+						<p>
+							{{ isSearchActive() ? 'Sortiert nach Relevanz (Dateiname & erkannter Volltext)' : 'Zuletzt hinzugefügte Dateien' }}
+						</p>
 					</div>
-					<button class="refresh-button" type="button" (click)="loadDocuments()" [disabled]="isLoading()" aria-label="Dokumente neu laden" title="Neu laden">
+					<button class="refresh-button" type="button" (click)="loadDocuments()" [disabled]="isLoading() || isSearching()" aria-label="Dokumente neu laden" title="Neu laden">
 						↻
 					</button>
 				</div>
 
-				@if (isLoading()) {
+				<form class="search-bar" (ngSubmit)="onSearchSubmit()" role="search" aria-label="Volltextsuche">
+					<input
+						class="search-bar__input"
+						type="search"
+						name="searchQuery"
+						[(ngModel)]="searchQuery"
+						(input)="onSearchInput()"
+						placeholder="Nach Begriff oder Dateiname suchen (z. B. Hello) ..."
+						aria-label="Suchbegriff eingeben">
+					<button
+						class="search-bar__submit"
+						type="submit"
+						[disabled]="isSearching()">
+						{{ isSearching() ? 'Suche ...' : 'Suchen' }}
+					</button>
+					@if (isSearchActive() || searchQuery.trim()) {
+						<button
+							class="search-bar__clear"
+							type="button"
+							(click)="clearSearch()"
+							aria-label="Suche zurücksetzen">
+							Zurücksetzen
+						</button>
+					}
+				</form>
+
+				@if (searchHint(); as hint) {
+					<p class="search-hint" role="status">{{ hint }}</p>
+				}
+
+				@if (isSearching()) {
+					<p class="list-state" role="status">Suche nach „{{ activeSearchQuery() }}“ läuft ...</p>
+				} @else if (searchError(); as sError) {
+					<div class="list-state search-error-state" role="alert">
+						<p class="message message--error">{{ sError }}</p>
+						<div class="search-error-actions">
+							<button class="search-bar__submit" type="button" (click)="retrySearch()">
+								Erneut suchen
+							</button>
+							<button class="search-bar__clear" type="button" (click)="clearSearch()">
+								Alle Dokumente anzeigen
+							</button>
+						</div>
+					</div>
+				} @else if (isSearchActive() && searchResults().length === 0) {
+					<div class="list-state empty-state" role="status">
+						<span class="empty-state__mark" aria-hidden="true">0</span>
+						<h3>Keine Treffer für „{{ activeSearchQuery() }}“</h3>
+						<p>Es wurden keine Dokumente mit diesem Begriff in Dateiname oder OCR-Volltext gefunden.</p>
+						<button class="search-bar__clear" type="button" (click)="clearSearch()">
+							Suche zurücksetzen
+						</button>
+					</div>
+				} @else if (isLoading()) {
 					<p class="list-state" role="status">Dokumente werden geladen ...</p>
 				} @else if (errorMessage()) {
 					<p class="list-state" role="alert">Die Dokumentliste ist derzeit nicht verfügbar.</p>
-				} @else if (documents().length === 0) {
+				} @else if (displayedDocuments().length === 0) {
 					<div class="list-state empty-state">
 						<span class="empty-state__mark" aria-hidden="true">PDF</span>
 						<h3>Noch keine Dokumente</h3>
@@ -50,7 +111,7 @@
 					</div>
 				} @else {
 					<ul class="document-list">
-						@for (document of documents(); track document.id) {
+						@for (document of displayedDocuments(); track document.id) {
 							<li class="document-row">
 								<span class="file-mark" aria-hidden="true">{{ document.filename.split('.').pop()?.toUpperCase() }}</span>
 								<div class="document-row__details">
@@ -59,9 +120,28 @@
 											{{ document.filename }}
 										</button>
 									</h3>
-									<p>{{ document.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</p>
+									<p class="document-row__meta">
+										<span>{{ document.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</span>
+										<span class="status-badge" [attr.data-status]="document.ocrStatus ?? 'PENDING'">
+											OCR: {{ document.ocrStatus ?? 'PENDING' }}
+										</span>
+										<span class="status-badge" [attr.data-status]="document.indexStatus ?? 'PENDING'">
+											Index: {{ document.indexStatus ?? 'PENDING' }}
+										</span>
+									</p>
+									@if (document.snippet) {
+										<p class="document-row__snippet">„{{ document.snippet }}“</p>
+									}
 								</div>
 								<span class="document-row__size">{{ formatSize(document.sizeBytes) }}</span>
+								<button
+									class="download-button"
+									type="button"
+									(click)="downloadDocument(document)"
+									[disabled]="downloadingId() === document.id"
+									[attr.aria-label]="'Dokument herunterladen: ' + document.filename">
+									{{ downloadingId() === document.id ? 'Lädt ...' : 'Download' }}
+								</button>
 								<button
 									class="delete-button"
 									type="button"
@@ -106,6 +186,9 @@
 					<div><dt>Typ</dt><dd>{{ document.contentType }}</dd></div>
 					<div><dt>Größe</dt><dd>{{ formatSize(document.sizeBytes) }}</dd></div>
 					<div><dt>Hochgeladen</dt><dd>{{ document.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</dd></div>
+					<div><dt>Storage-Key</dt><dd>{{ document.storageKey ?? ('documents/' + document.id + '.pdf') }}</dd></div>
+					<div><dt>OCR-Status</dt><dd>{{ document.ocrStatus ?? 'PENDING' }}</dd></div>
+					<div><dt>Index-Status</dt><dd>{{ document.indexStatus ?? 'PENDING' }}</dd></div>
 				</dl>
 
 				<form (ngSubmit)="saveFilename()">
@@ -125,6 +208,13 @@
 						}
 					</div>
 					<div class="rename-dialog__actions">
+						<button
+							class="rename-dialog__back"
+							type="button"
+							(click)="downloadDocument(document)"
+							[disabled]="downloadingId() === document.id">
+							{{ downloadingId() === document.id ? 'Wird geladen ...' : 'PDF herunterladen' }}
+						</button>
 						<button class="rename-dialog__save" type="submit" [disabled]="!editedFilename.trim() || isUpdating()">
 							{{ isUpdating() ? 'Wird gespeichert ...' : 'Namen speichern' }}
 						</button>
@@ -133,7 +223,7 @@
 
 				<section class="share-link-section" aria-labelledby="share-links-heading">
 					<h3 id="share-links-heading">Share-Links</h3>
-					<p class="share-link-notice">Die API bietet derzeit keine Liste bereits vorhandener Links. Hier erscheinen Links, die du in dieser Sitzung erstellst.</p>
+					<p class="share-link-notice">Erstelle passwortgeschützte Links mit Ablaufdatum für dieses Dokument.</p>
 
 					<form class="share-link-form" (ngSubmit)="createShareLink()">
 						<div class="rename-dialog__field">

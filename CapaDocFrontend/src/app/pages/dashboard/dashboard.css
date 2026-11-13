@@ -52,14 +52,11 @@
 
 .documents-panel {
   box-sizing: border-box;
+  min-height: 280px;
+  padding: 1.4rem 1.5rem;
   border: 1px solid #dce4dc;
   border-radius: 6px;
   background: #fff;
-}
-
-.documents-panel {
-  min-height: 280px;
-  padding: 1.4rem 1.5rem;
 }
 
 .panel-heading {
@@ -92,7 +89,8 @@
 }
 
 .refresh-button:disabled,
-.delete-button:disabled {
+.delete-button:disabled,
+.download-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -108,7 +106,7 @@
 
 .document-row {
   display: grid;
-  grid-template-columns: 2.6rem minmax(0, 1fr) auto auto;
+  grid-template-columns: 2.6rem minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 0.85rem;
   min-height: 4.75rem;
@@ -161,6 +159,19 @@
 
 .document-row__details p {
   overflow-wrap: anywhere;
+}
+
+.download-button {
+  padding: 0.5rem 0.35rem;
+  border: 0;
+  background: transparent;
+  color: #345441;
+  font: 600 0.8rem/1.2 Arial, sans-serif;
+  cursor: pointer;
+}
+
+.download-button:hover {
+  text-decoration: underline;
 }
 
 .delete-button {

@@ -258,3 +258,104 @@ body {
 		flex-wrap: wrap;
 	}
 }
+
+.search-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.6rem;
+	margin: 1rem 0 0.75rem;
+}
+
+.search-bar__input {
+	flex: 1 1 16rem;
+	min-height: 2.35rem;
+	padding: 0.4rem 0.75rem;
+	border: 1px solid #cbd5cb;
+	border-radius: 4px;
+	background: #f9fbf9;
+	color: #24342c;
+	font: 400 0.88rem/1.4 Arial, sans-serif;
+}
+
+.search-bar__input:focus {
+	border-color: #456596;
+	outline: none;
+	background: #fff;
+}
+
+.search-bar__submit,
+.search-bar__clear {
+	min-height: 2.35rem;
+	padding: 0.4rem 0.9rem;
+	border-radius: 4px;
+	font: 600 0.83rem/1.2 Arial, sans-serif;
+	cursor: pointer;
+}
+
+.search-bar__submit {
+	border: 0;
+	background: #456596;
+	color: #fff;
+}
+
+.search-bar__submit:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.search-bar__clear {
+	border: 1px solid #cbd5cb;
+	background: #fff;
+	color: #456596;
+}
+
+.search-hint {
+	margin: 0.25rem 0 0.75rem;
+	padding: 0.5rem 0.75rem;
+	border-radius: 4px;
+	background: #f1f5f9;
+	color: #475569;
+	font: 400 0.82rem/1.4 Arial, sans-serif;
+}
+
+.search-error-state {
+	gap: 0.7rem;
+	padding: 1rem 0;
+}
+
+.search-error-actions,
+.document-row__meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.search-error-actions {
+	justify-content: center;
+}
+
+.status-badge {
+	padding: 0.1rem 0.38rem;
+	border-radius: 3px;
+	background: #eef2f6;
+	color: #475569;
+	font: 600 0.68rem/1.3 Arial, sans-serif;
+}
+
+.status-badge[data-status="DONE"] {
+	background: #e6f4ea;
+	color: #1e6f3d;
+}
+
+.status-badge[data-status="FAILED"] {
+	background: #fce8e6;
+	color: #a52714;
+}
+
+.document-row__snippet {
+	margin: 0.25rem 0 0;
+	color: #3b4d43;
+	font: italic 400 0.8rem/1.4 Georgia, serif;
+}

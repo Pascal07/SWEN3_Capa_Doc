@@ -1,19 +1,28 @@
 package at.capadocapi;
 
+import at.capadocapi.exception.StorageException;
+import at.capadocapi.exception.StorageObjectNotFoundException;
 import at.capadocapi.model.DocumentEntity;
+import at.capadocapi.model.ProcessingStatus;
 import at.capadocapi.model.dto.OcrMessage;
 import at.capadocapi.repository.DocumentRepository;
 import at.capadocapi.service.DocumentServiceImpl;
 import at.capadocapi.service.Interfaces.DocumentMessagePublisher;
 import at.capadocapi.service.Interfaces.DocumentService;
+import at.capadocapi.service.Interfaces.StorageService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataRetrievalFailureException;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -30,6 +39,9 @@ public class DocumentServiceImplTest {
 
     @Mock
     private DocumentMessagePublisher messagePublisher;
+
+    @Mock
+    private StorageService storageService;
 
     @InjectMocks
     private DocumentServiceImpl documentService;
@@ -295,5 +307,189 @@ public class DocumentServiceImplTest {
                 .hasMessage("DocumentEntity must not be null");
 
         verify(documentRepository, never()).save(any());
+    }
+
+    @Test
+    void createDocumentWithFile_validPdf_uploadsToRustFsSetsStorageKeyAndPublishesMessage() {
+        byte[] pdfBytes = "%PDF-1.7 valid pdf content".getBytes(StandardCharsets.UTF_8);
+        MockMultipartFile pdfFile = new MockMultipartFile(
+                "file", "invoice.pdf", "application/pdf", pdfBytes);
+
+        DocumentEntity input = new DocumentEntity();
+        input.setFilename("invoice.pdf");
+
+        when(documentRepository.save(any(DocumentEntity.class))).thenAnswer(inv -> {
+            DocumentEntity doc = inv.getArgument(0);
+            if (doc.getId() == null) {
+                doc.setId(42L);
+            }
+            return doc;
+        });
+
+        DocumentEntity saved = documentService.createDocument(input, pdfFile);
+
+        assertThat(saved.getId()).isEqualTo(42L);
+        assertThat(saved.getStorageKey()).isEqualTo("documents/42.pdf");
+        assertThat(saved.getOcrStatus()).isEqualTo(ProcessingStatus.PENDING);
+        assertThat(saved.getIndexStatus()).isEqualTo(ProcessingStatus.PENDING);
+        assertThat(saved.getSizeBytes()).isEqualTo((long) pdfBytes.length);
+        assertThat(saved.getContentType()).isEqualTo("application/pdf");
+
+        verify(storageService).upload("documents/42.pdf", pdfBytes, "application/pdf");
+
+        ArgumentCaptor<OcrMessage> msgCaptor = ArgumentCaptor.forClass(OcrMessage.class);
+        verify(messagePublisher).publishOcrMessage(msgCaptor.capture());
+        assertThat(msgCaptor.getValue().getDocumentId()).isEqualTo(42L);
+        assertThat(msgCaptor.getValue().getStorageKey()).isEqualTo("documents/42.pdf");
+    }
+
+    @Test
+    void createDocumentWithFile_whenTransactionActive_publishesMessageOnlyAfterCommit() {
+        byte[] pdfBytes = "%PDF-1.7 valid pdf content".getBytes(StandardCharsets.UTF_8);
+        MockMultipartFile pdfFile = new MockMultipartFile(
+                "file", "invoice.pdf", "application/pdf", pdfBytes);
+        DocumentEntity input = new DocumentEntity();
+        input.setFilename("invoice.pdf");
+
+        when(documentRepository.save(any(DocumentEntity.class))).thenAnswer(inv -> {
+            DocumentEntity doc = inv.getArgument(0);
+            if (doc.getId() == null) {
+                doc.setId(15L);
+            }
+            return doc;
+        });
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            documentService.createDocument(input, pdfFile);
+
+            // Vor dem Commit darf noch keine Queue-Nachricht gesendet worden sein
+            verify(messagePublisher, never()).publishOcrMessage(any());
+
+            // Simuliere erfolgreichen Transaction-Commit
+            for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
+                sync.afterCommit();
+            }
+
+            ArgumentCaptor<OcrMessage> msgCaptor = ArgumentCaptor.forClass(OcrMessage.class);
+            verify(messagePublisher, times(1)).publishOcrMessage(msgCaptor.capture());
+            assertThat(msgCaptor.getValue().getDocumentId()).isEqualTo(15L);
+            assertThat(msgCaptor.getValue().getStorageKey()).isEqualTo("documents/15.pdf");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void createDocumentWithFile_whenUploadToRustFsFails_propagatesExceptionAndDoesNotPublishMessage() {
+        byte[] pdfBytes = "%PDF-1.7 valid pdf content".getBytes(StandardCharsets.UTF_8);
+        MockMultipartFile pdfFile = new MockMultipartFile(
+                "file", "invoice.pdf", "application/pdf", pdfBytes);
+        DocumentEntity input = new DocumentEntity();
+        input.setFilename("invoice.pdf");
+
+        when(documentRepository.save(any(DocumentEntity.class))).thenAnswer(inv -> {
+            DocumentEntity doc = inv.getArgument(0);
+            doc.setId(99L);
+            return doc;
+        });
+        doThrow(new StorageException("RustFS down"))
+                .when(storageService).upload(anyString(), any(byte[].class), anyString());
+
+        assertThatThrownBy(() -> documentService.createDocument(input, pdfFile))
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining("RustFS down");
+
+        verify(documentRepository, times(1)).save(any(DocumentEntity.class));
+        verify(messagePublisher, never()).publishOcrMessage(any());
+    }
+
+    @Test
+    void createDocumentWithFile_whenSecondSaveFails_deletesUploadedObjectFromRustFs() {
+        byte[] pdfBytes = "%PDF-1.7 valid pdf content".getBytes(StandardCharsets.UTF_8);
+        MockMultipartFile pdfFile = new MockMultipartFile(
+                "file", "invoice.pdf", "application/pdf", pdfBytes);
+        DocumentEntity input = new DocumentEntity();
+        input.setFilename("invoice.pdf");
+
+        when(documentRepository.save(any(DocumentEntity.class)))
+                .thenAnswer(inv -> {
+                    DocumentEntity doc = inv.getArgument(0);
+                    doc.setId(55L);
+                    return doc;
+                })
+                .thenThrow(new DataRetrievalFailureException("DB failure on second save"));
+
+        assertThatThrownBy(() -> documentService.createDocument(input, pdfFile))
+                .isInstanceOf(EmptyResultDataAccessException.class);
+
+        verify(storageService).upload("documents/55.pdf", pdfBytes, "application/pdf");
+        verify(storageService).delete("documents/55.pdf");
+        verify(messagePublisher, never()).publishOcrMessage(any());
+    }
+
+    @Test
+    void createDocumentWithFile_emptyFile_throwsIllegalArgumentException() {
+        MockMultipartFile emptyFile = new MockMultipartFile(
+                "file", "empty.pdf", "application/pdf", new byte[0]);
+
+        assertThatThrownBy(() -> documentService.createDocument(new DocumentEntity(), emptyFile))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("empty");
+
+        verifyNoInteractions(documentRepository, storageService, messagePublisher);
+    }
+
+    @Test
+    void createDocumentWithFile_nonPdfContentType_throwsIllegalArgumentException() {
+        MockMultipartFile textFile = new MockMultipartFile(
+                "file", "notes.txt", "text/plain", "%PDF-1.7".getBytes(StandardCharsets.UTF_8));
+
+        assertThatThrownBy(() -> documentService.createDocument(new DocumentEntity(), textFile))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("application/pdf");
+
+        verifyNoInteractions(documentRepository, storageService, messagePublisher);
+    }
+
+    @Test
+    void createDocumentWithFile_invalidMagicBytes_throwsIllegalArgumentException() {
+        MockMultipartFile fakePdf = new MockMultipartFile(
+                "file", "fake.pdf", "application/pdf", "NOT_A_PDF_FILE".getBytes(StandardCharsets.UTF_8));
+
+        assertThatThrownBy(() -> documentService.createDocument(new DocumentEntity(), fakePdf))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("%PDF");
+
+        verifyNoInteractions(documentRepository, storageService, messagePublisher);
+    }
+
+    @Test
+    void deleteDocument_withStorageKey_deletesFromStorageAndRepository() {
+        DocumentEntity doc = new DocumentEntity();
+        doc.setId(10L);
+        doc.setStorageKey("documents/10.pdf");
+        when(documentRepository.findById(10L)).thenReturn(Optional.of(doc));
+
+        documentService.deleteDocument(10L);
+
+        verify(storageService).delete("documents/10.pdf");
+        verify(documentRepository).deleteById(10L);
+        verify(messagePublisher).publishDeleteIndexMessage(10L);
+    }
+
+    @Test
+    void deleteDocument_whenObjectMissingInRustFs_stillDeletesFromRepository() {
+        DocumentEntity doc = new DocumentEntity();
+        doc.setId(11L);
+        doc.setStorageKey("documents/11.pdf");
+        when(documentRepository.findById(11L)).thenReturn(Optional.of(doc));
+        doThrow(new StorageObjectNotFoundException("documents/11.pdf"))
+                .when(storageService).delete("documents/11.pdf");
+
+        documentService.deleteDocument(11L);
+
+        verify(storageService).delete("documents/11.pdf");
+        verify(documentRepository).deleteById(11L);
     }
 }

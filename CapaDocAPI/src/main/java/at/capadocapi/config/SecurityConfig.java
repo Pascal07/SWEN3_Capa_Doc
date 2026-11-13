@@ -35,8 +35,21 @@ public class SecurityConfig {
                                     ObjectMapper objectMapper) throws Exception {
         http
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers(HttpMethod.GET, "/links/{shortCode}", "/api/links/{shortCode}").permitAll()
-                        .requestMatchers("/api/ping", "/ping", "/error").permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/links/{shortCode}",
+                                "/api/links/{shortCode}",
+                                "/links/{shortCode}/download",
+                                "/api/links/{shortCode}/download").permitAll()
+                        .requestMatchers(
+                                "/api/ping",
+                                "/ping",
+                                "/error",
+                                "/documents",
+                                "/documents/**",
+                                "/api/documents",
+                                "/api/documents/**",
+                                "/links/**",
+                                "/api/links/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(o -> o.defaultSuccessUrl(frontendUrl + "/dashboard", true))
                 .exceptionHandling(e -> e
@@ -48,6 +61,13 @@ public class SecurityConfig {
                                         "You are not allowed to access this resource.", objectMapper)))
                 .logout(l -> l.logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler()))
                 .csrf(c -> c
+                        .ignoringRequestMatchers(
+                                "/documents",
+                                "/documents/**",
+                                "/api/documents",
+                                "/api/documents/**",
+                                "/links/**",
+                                "/api/links/**")
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);

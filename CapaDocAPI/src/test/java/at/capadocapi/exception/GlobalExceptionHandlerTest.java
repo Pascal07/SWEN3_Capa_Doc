@@ -56,6 +56,38 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
+    @Test
+    void storageObjectNotFound_returnsNotFoundAndErrorDto() throws Exception {
+        mockMvc.perform(get("/test/storage-not-found"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.message").value("Storage object not found for key: documents/99.pdf"))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void storageFailure_returnsBadGatewayAndErrorDto() throws Exception {
+        mockMvc.perform(get("/test/storage-failure"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.status").value(502))
+                .andExpect(jsonPath("$.error").value("Bad Gateway"))
+                .andExpect(jsonPath("$.message")
+                        .value("The object storage service is currently unavailable. Please try again later."))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void searchServiceFailure_returnsServiceUnavailableAndErrorDto() throws Exception {
+        mockMvc.perform(get("/test/search-failure"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.error").value("Service Unavailable"))
+                .andExpect(jsonPath("$.message")
+                        .value("The search service is currently unavailable. Please try again later."))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
     @RestController
     static class ExceptionThrowingController {
 
@@ -72,6 +104,21 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/bad-request")
         void badRequest() {
             throw new IllegalArgumentException("invalid document");
+        }
+
+        @GetMapping("/test/storage-not-found")
+        void storageNotFound() {
+            throw new StorageObjectNotFoundException("documents/99.pdf");
+        }
+
+        @GetMapping("/test/storage-failure")
+        void storageFailure() {
+            throw new StorageException("S3 connection failed");
+        }
+
+        @GetMapping("/test/search-failure")
+        void searchFailure() {
+            throw new SearchServiceUnavailableException("Elasticsearch unreachable");
         }
     }
 }

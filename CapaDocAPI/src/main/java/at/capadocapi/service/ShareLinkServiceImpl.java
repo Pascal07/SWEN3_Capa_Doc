@@ -70,6 +70,25 @@ public class ShareLinkServiceImpl implements ShareLinkService {
         return shareLinkMapper.toResponseDto(savedLink);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ShareLinkResponseDTO> getShareLinksForDocument(Long documentId) {
+        final DocumentEntity document;
+        try {
+            document = documentRepository.findById(documentId)
+                    .orElseThrow(() -> new DocumentNotFoundException(documentId));
+        } catch (DataAccessException ex) {
+            throw dataAccessException("Could not load document " + documentId, ex);
+        }
+
+        if (document.getShareLinks() == null) {
+            return List.of();
+        }
+        return document.getShareLinks().stream()
+                .map(shareLinkMapper::toResponseDto)
+                .toList();
+    }
+
     // GET /links/{shortCode}?password=...
     @Override
     @Transactional(readOnly = true)

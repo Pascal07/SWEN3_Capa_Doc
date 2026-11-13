@@ -10,6 +10,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.time.LocalDateTime;
 
@@ -45,7 +47,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             IllegalArgumentException.class,
             MethodArgumentNotValidException.class,
-            MissingServletRequestParameterException.class
+            MissingServletRequestParameterException.class,
+            MissingServletRequestPartException.class
     })
     public ResponseEntity<ErrorResponse> handleBadRequest(Exception ex) {
         String message = ex instanceof MethodArgumentNotValidException validation
@@ -55,6 +58,29 @@ public class GlobalExceptionHandler {
                 .orElse("Request validation failed.")
                 : ex.getMessage();
         return error(HttpStatus.BAD_REQUEST, message);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
+        log.warn("Uploaded file exceeds maximum allowed size", ex);
+        return error(HttpStatus.CONTENT_TOO_LARGE, "Uploaded file exceeds the maximum allowed size.");
+    }
+
+    @ExceptionHandler(StorageObjectNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleStorageObjectNotFound(StorageObjectNotFoundException ex) {
+        log.warn("Storage object not found: {}", ex.getMessage());
+        return error(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<ErrorResponse> handleStorageException(StorageException ex) {
+        if (ex.isNotFound()) {
+            log.warn("Storage object not found: {}", ex.getMessage());
+            return error(HttpStatus.NOT_FOUND, ex.getMessage());
+        }
+        log.error("Object storage failure", ex);
+        return error(HttpStatus.BAD_GATEWAY,
+                "The object storage service is currently unavailable. Please try again later.");
     }
 
     @ExceptionHandler(AccessDeniedException.class)
@@ -74,6 +100,13 @@ public class GlobalExceptionHandler {
         log.error("RabbitMQ error while publishing message", ex);
         return error(HttpStatus.SERVICE_UNAVAILABLE,
                 "The messaging service is currently unavailable. Please try again later.");
+    }
+
+    @ExceptionHandler(SearchServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleSearchServiceUnavailable(SearchServiceUnavailableException ex) {
+        log.error("Elasticsearch search service failure", ex);
+        return error(HttpStatus.SERVICE_UNAVAILABLE,
+                "The search service is currently unavailable. Please try again later.");
     }
 
     @ExceptionHandler(Exception.class)
