@@ -1,0 +1,45 @@
+info:
+  name: Upload Document PDF
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/documents"
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - 01-Documents/HelloWorld.pdf
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 201 || res.getStatus() === 200) {
+          const body = res.getBody();
+          bru.setVar("documentId", body.id);
+        }
+    - type: tests
+      code: |-
+        test("status is 201 Created", function () {
+          expect(res.getStatus()).to.equal(201);
+        });
+
+        test("response contains id, storageKey, ocrStatus, indexStatus", function () {
+          const body = res.getBody();
+          expect(body).to.have.property("id");
+          expect(body).to.have.property("storageKey");
+          expect(body).to.have.property("ocrStatus");
+          expect(body).to.have.property("indexStatus");
+          expect(body.filename).to.equal("HelloWorld.pdf");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

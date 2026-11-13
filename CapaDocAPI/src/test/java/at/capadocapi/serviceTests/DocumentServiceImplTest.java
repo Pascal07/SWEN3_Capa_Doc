@@ -475,6 +475,7 @@ public class DocumentServiceImplTest {
 
         verify(storageService).delete("documents/10.pdf");
         verify(documentRepository).deleteById(10L);
+        verify(messagePublisher).publishDeleteIndexMessage(10L);
     }
 
     @Test

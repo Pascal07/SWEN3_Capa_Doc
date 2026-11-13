@@ -102,6 +102,13 @@ public class GlobalExceptionHandler {
                 "The messaging service is currently unavailable. Please try again later.");
     }
 
+    @ExceptionHandler(SearchServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleSearchServiceUnavailable(SearchServiceUnavailableException ex) {
+        log.error("Elasticsearch search service failure", ex);
+        return error(HttpStatus.SERVICE_UNAVAILABLE,
+                "The search service is currently unavailable. Please try again later.");
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
         log.error("Unhandled application error", ex);

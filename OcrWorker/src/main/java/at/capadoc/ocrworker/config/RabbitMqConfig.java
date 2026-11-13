@@ -110,16 +110,70 @@ public class RabbitMqConfig {
                 .with(routingKey);
     }
 
+    // 4. Status-Exchange, Queue & Dead-Letter-Queue (für Status-Updates an den REST-Server)
+    @Bean
+    public DirectExchange statusDeadLetterExchange(
+            @Value("${capadoc.rabbitmq.status.dlx:document.status.dlx}") String dlxName) {
+        return new DirectExchange(dlxName);
+    }
+
+    @Bean
+    public Queue statusDeadLetterQueue(
+            @Value("${capadoc.rabbitmq.status.dlq:document.status.dlq}") String dlqName) {
+        return QueueBuilder.durable(dlqName).build();
+    }
+
+    @Bean
+    public Binding statusDlqBinding(
+            Queue statusDeadLetterQueue,
+            DirectExchange statusDeadLetterExchange,
+            @Value("${capadoc.rabbitmq.status.dlq.routingkey:document.status.dlq.routingkey}") String dlqRoutingKey) {
+        return BindingBuilder
+                .bind(statusDeadLetterQueue)
+                .to(statusDeadLetterExchange)
+                .with(dlqRoutingKey);
+    }
+
+    @Bean
+    public DirectExchange statusExchange(
+            @Value("${capadoc.rabbitmq.status.exchange:document.status.exchange}") String exchangeName) {
+        return new DirectExchange(exchangeName);
+    }
+
+    @Bean
+    public Queue statusQueue(
+            @Value("${capadoc.rabbitmq.status.queue:document.status}") String queueName,
+            @Value("${capadoc.rabbitmq.status.dlx:document.status.dlx}") String deadLetterExchange,
+            @Value("${capadoc.rabbitmq.status.dlq.routingkey:document.status.dlq.routingkey}") String deadLetterRoutingKey) {
+        return QueueBuilder.durable(queueName)
+                .withArgument("x-dead-letter-exchange", deadLetterExchange)
+                .withArgument("x-dead-letter-routing-key", deadLetterRoutingKey)
+                .build();
+    }
+
+    @Bean
+    public Binding statusBinding(
+            Queue statusQueue,
+            DirectExchange statusExchange,
+            @Value("${capadoc.rabbitmq.status.routingkey:document.status.routingkey}") String routingKey) {
+        return BindingBuilder
+                .bind(statusQueue)
+                .to(statusExchange)
+                .with(routingKey);
+    }
+
     @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             ConnectionFactory connectionFactory,
-            MessageConverter messageConverter) {
+            MessageConverter messageConverter,
+            @Value("${spring.rabbitmq.listener.simple.auto-startup:true}") boolean autoStartup) {
 
         SimpleRabbitListenerContainerFactory factory =
                 new SimpleRabbitListenerContainerFactory();
 
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(messageConverter);
+        factory.setAutoStartup(autoStartup);
 
         // Bei einem Fehler nicht endlos dieselbe Nachricht erneut zustellen.
         factory.setDefaultRequeueRejected(false);

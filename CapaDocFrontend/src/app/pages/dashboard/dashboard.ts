@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -16,7 +16,7 @@ import { AuthService } from '../../services/auth/auth';
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css',
 })
-export class Dashboard implements OnInit {
+export class Dashboard implements OnInit, OnDestroy {
   private readonly documentsApi = inject(DocumentsApi);
   private readonly shareLinksApi = inject(ShareLinksApi);
   readonly auth = inject(AuthService);
@@ -35,6 +35,21 @@ export class Dashboard implements OnInit {
   readonly detailError = signal('');
   readonly errorMessage = signal('');
   readonly successMessage = signal('');
+
+  // Search state
+  searchQuery = '';
+  readonly activeSearchQuery = signal('');
+  readonly isSearchActive = signal(false);
+  readonly isSearching = signal(false);
+  readonly searchResults = signal<DocumentRecord[]>([]);
+  readonly searchError = signal('');
+  readonly searchHint = signal('');
+  private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  readonly displayedDocuments = computed(() =>
+    this.isSearchActive() ? this.searchResults() : this.documents(),
+  );
+
   editedFilename = '';
   readonly filenameExtension = signal('');
   sharePassword = '';
@@ -42,6 +57,10 @@ export class Dashboard implements OnInit {
 
   ngOnInit(): void {
     void this.loadDocuments();
+  }
+
+  ngOnDestroy(): void {
+    this.clearDebounceTimer();
   }
 
   async loadDocuments(): Promise<void> {
@@ -55,6 +74,9 @@ export class Dashboard implements OnInit {
           (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
         ),
       );
+      if (this.isSearchActive() && this.activeSearchQuery()) {
+        await this.executeSearch(this.activeSearchQuery());
+      }
     } catch (error) {
       this.errorMessage.set(this.getRequestErrorMessage(
         error,
@@ -62,6 +84,92 @@ export class Dashboard implements OnInit {
       ));
     } finally {
       this.isLoading.set(false);
+    }
+  }
+
+  onSearchInput(): void {
+    this.clearDebounceTimer();
+    this.searchHint.set('');
+
+    const trimmed = this.searchQuery.trim();
+    if (!trimmed) {
+      if (this.isSearchActive()) {
+        this.isSearchActive.set(false);
+        this.activeSearchQuery.set('');
+        this.searchResults.set([]);
+        this.searchError.set('');
+        this.isSearching.set(false);
+      }
+      return;
+    }
+
+    this.searchDebounceTimer = setTimeout(() => {
+      void this.executeSearch(trimmed);
+    }, 350);
+  }
+
+  async onSearchSubmit(): Promise<void> {
+    this.clearDebounceTimer();
+    const trimmed = this.searchQuery.trim();
+
+    if (!trimmed) {
+      this.isSearchActive.set(false);
+      this.activeSearchQuery.set('');
+      this.searchResults.set([]);
+      this.searchError.set('');
+      this.isSearching.set(false);
+      this.searchHint.set('Bitte gib einen Suchbegriff ein. Es wird die normale Dokumentenliste angezeigt.');
+      return;
+    }
+
+    await this.executeSearch(trimmed);
+  }
+
+  async executeSearch(query: string): Promise<void> {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    this.searchHint.set('');
+    this.searchError.set('');
+    this.isSearchActive.set(true);
+    this.activeSearchQuery.set(trimmed);
+    this.isSearching.set(true);
+
+    try {
+      const results = await this.documentsApi.search(trimmed, 0, 20);
+      this.searchResults.set(results);
+    } catch (error) {
+      this.searchResults.set([]);
+      this.searchError.set(this.getSearchErrorMessage(error));
+    } finally {
+      this.isSearching.set(false);
+    }
+  }
+
+  retrySearch(): void {
+    const query = this.activeSearchQuery() || this.searchQuery.trim();
+    if (query) {
+      void this.executeSearch(query);
+    }
+  }
+
+  clearSearch(): void {
+    this.clearDebounceTimer();
+    this.searchQuery = '';
+    this.activeSearchQuery.set('');
+    this.isSearchActive.set(false);
+    this.isSearching.set(false);
+    this.searchResults.set([]);
+    this.searchError.set('');
+    this.searchHint.set('');
+  }
+
+  private clearDebounceTimer(): void {
+    if (this.searchDebounceTimer !== null) {
+      clearTimeout(this.searchDebounceTimer);
+      this.searchDebounceTimer = null;
     }
   }
 
@@ -105,10 +213,11 @@ export class Dashboard implements OnInit {
     try {
       await this.documentsApi.delete(document.id);
       this.documents.update((items) => items.filter((item) => item.id !== document.id));
+      this.searchResults.update((items) => items.filter((item) => item.id !== document.id));
       if (this.editingDocument()?.id === document.id) {
         this.editingDocument.set(null);
       }
-      this.successMessage.set('Dokument wurde aus Datenbank und RustFS gelöscht.');
+      this.successMessage.set('Dokument wurde aus Datenbank, RustFS und dem Suchindex gelöscht.');
     } catch (error) {
       this.errorMessage.set(this.getRequestErrorMessage(
         error,
@@ -189,6 +298,9 @@ export class Dashboard implements OnInit {
       const updatedDocument = await this.documentsApi.update(document.id, request);
       this.documents.update((items) =>
         items.map((item) => item.id === updatedDocument.id ? updatedDocument : item),
+      );
+      this.searchResults.update((items) =>
+        items.map((item) => item.id === updatedDocument.id ? { ...updatedDocument, snippet: item.snippet } : item),
       );
       this.editingDocument.set(updatedDocument);
       this.detailMessage.set('Dokumentname wurde geändert.');
@@ -282,6 +394,27 @@ export class Dashboard implements OnInit {
 
   formatSize(sizeBytes: number): string {
     return formatFileSize(sizeBytes);
+  }
+
+  private getSearchErrorMessage(error: unknown): string {
+    if (error instanceof TimeoutError) {
+      return 'Zeitüberschreitung bei der Suche. Bitte versuche es erneut.';
+    }
+    if (error instanceof HttpErrorResponse) {
+      if (error.status === 503 || error.status === 502) {
+        return 'Der Suchdienst (Elasticsearch) ist derzeit nicht erreichbar. Bitte prüfe den Service und versuche es erneut.';
+      }
+      if (error.status === 400) {
+        return error.error?.message || 'Ungültige Suchanfrage. Bitte gib einen gültigen Suchbegriff ein.';
+      }
+      if (error.status === 401) {
+        return 'Bitte melde dich an, um Dokumente zu durchsuchen.';
+      }
+      if (error.status === 0) {
+        return 'Netzwerkfehler: Die Verbindung zum Backend ist fehlgeschlagen.';
+      }
+    }
+    return 'Die Suche konnte nicht durchgeführt werden. Bitte versuche es erneut.';
   }
 
   private getRequestErrorMessage(error: unknown, fallbackMessage: string): string {

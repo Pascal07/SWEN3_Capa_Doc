@@ -6,9 +6,10 @@ import at.capadocapi.model.DocumentEntity;
 import at.capadocapi.model.dto.DocumentRequestDTO;
 import at.capadocapi.model.dto.DocumentResponseDTO;
 import at.capadocapi.service.DocumentServiceImpl;
+import at.capadocapi.service.Interfaces.DocumentSearchService;
 import at.capadocapi.service.Interfaces.DocumentService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -25,11 +26,47 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping({"/api/documents", "/documents"})
-@RequiredArgsConstructor
 public class DocumentController {
 
     private final DocumentService documentService;
     private final DocumentMapper documentMapper;
+    private final DocumentSearchService documentSearchService;
+
+    @Autowired
+    public DocumentController(
+            DocumentService documentService,
+            DocumentMapper documentMapper,
+            DocumentSearchService documentSearchService) {
+        this.documentService = documentService;
+        this.documentMapper = documentMapper;
+        this.documentSearchService = documentSearchService;
+    }
+
+    public DocumentController(
+            DocumentService documentService,
+            DocumentMapper documentMapper) {
+        this(documentService, documentMapper, null);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<DocumentResponseDTO>> searchDocuments(
+            @RequestParam(value = "q", required = false) String query,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @AuthenticationPrincipal OidcUser user) {
+        if (query == null || query.isBlank()) {
+            throw new IllegalArgumentException("Search query 'q' must not be blank");
+        }
+        if (page < 0) {
+            throw new IllegalArgumentException("Page index must not be less than 0");
+        }
+        if (size <= 0 || size > 100) {
+            throw new IllegalArgumentException("Page size must be between 1 and 100");
+        }
+        String ownerSub = (user != null) ? user.getSubject() : null;
+        List<DocumentResponseDTO> results = documentSearchService.searchDocuments(query, page, size, ownerSub);
+        return ResponseEntity.ok(results);
+    }
 
     @GetMapping
     public ResponseEntity<List<DocumentResponseDTO>> getAllDocuments(

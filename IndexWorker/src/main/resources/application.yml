@@ -1,0 +1,22 @@
+elasticsearch:
+  url: ${ELASTICSEARCH_URL:http://localhost:9200}
+  indexName: ${ELASTICSEARCH_INDEX:documents}
+  username: ${ELASTICSEARCH_USERNAME:}
+  password: ${ELASTICSEARCH_PASSWORD:}
+  autoCreateIndex: ${ELASTICSEARCH_AUTO_CREATE_INDEX:true}
+  maxRetries: ${ELASTICSEARCH_INIT_MAX_RETRIES:10}
+  retryDelayMs: ${ELASTICSEARCH_INIT_RETRY_DELAY_MS:2000}
+  indexingMaxRetries: ${INDEXING_MAX_RETRIES:3}
+  indexingRetryBackoffMs: ${INDEXING_RETRY_BACKOFF_MS:500}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+elasticsearch:
+  url: ${ELASTICSEARCH_URL:http://elasticsearch:9200}
+  indexName: ${ELASTICSEARCH_INDEX:documents}
+  username: ${ELASTICSEARCH_USERNAME:}
+  password: ${ELASTICSEARCH_PASSWORD:}

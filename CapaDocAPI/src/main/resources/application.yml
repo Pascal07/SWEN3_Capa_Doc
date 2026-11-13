@@ -15,6 +15,15 @@ storage:
     maxRetries: ${RUSTFS_INIT_MAX_RETRIES:10}
     retryDelayMs: ${RUSTFS_INIT_RETRY_DELAY_MS:2000}
 
+elasticsearch:
+  url: ${ELASTICSEARCH_URL:http://localhost:9200}
+  indexName: ${ELASTICSEARCH_INDEX:documents}
+  username: ${ELASTICSEARCH_USERNAME:}
+  password: ${ELASTICSEARCH_PASSWORD:}
+  autoCreateIndex: ${ELASTICSEARCH_AUTO_CREATE_INDEX:true}
+  maxRetries: ${ELASTICSEARCH_INIT_MAX_RETRIES:10}
+  retryDelayMs: ${ELASTICSEARCH_INIT_RETRY_DELAY_MS:2000}
+
 ---
 spring:
   config:
@@ -42,3 +51,9 @@ storage:
     secretKey: ${RUSTFS_SECRET_KEY:}
     bucket: ${RUSTFS_BUCKET:documents}
     region: ${RUSTFS_REGION:us-east-1}
+
+elasticsearch:
+  url: ${ELASTICSEARCH_URL:http://elasticsearch:9200}
+  indexName: ${ELASTICSEARCH_INDEX:documents}
+  username: ${ELASTICSEARCH_USERNAME:}
+  password: ${ELASTICSEARCH_PASSWORD:}

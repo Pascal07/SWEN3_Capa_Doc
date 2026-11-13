@@ -1,0 +1,49 @@
+info:
+  name: Search Documents
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/documents/search?q=Hello&page=0&size=20"
+  params:
+    - name: q
+      value: Hello
+      type: query
+    - name: page
+      value: "0"
+      type: query
+    - name: size
+      value: "20"
+      type: query
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("status is 200 OK", function () {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("response is an array of search hits", function () {
+          const body = res.getBody();
+          expect(body).to.be.an("array");
+        });
+
+        test("each search hit has document metadata", function () {
+          const body = res.getBody();
+          body.forEach((doc) => {
+            expect(doc).to.have.property("id");
+            expect(doc).to.have.property("filename");
+            expect(doc).to.have.property("uploadedAt");
+            expect(doc).to.have.property("ocrStatus");
+            expect(doc).to.have.property("indexStatus");
+          });
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

@@ -52,14 +52,11 @@
 
 .documents-panel {
   box-sizing: border-box;
+  min-height: 280px;
+  padding: 1.4rem 1.5rem;
   border: 1px solid #dce4dc;
   border-radius: 6px;
   background: #fff;
-}
-
-.documents-panel {
-  min-height: 280px;
-  padding: 1.4rem 1.5rem;
 }
 
 .panel-heading {
@@ -92,7 +89,8 @@
 }
 
 .refresh-button:disabled,
-.delete-button:disabled {
+.delete-button:disabled,
+.download-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -174,11 +172,6 @@
 
 .download-button:hover {
   text-decoration: underline;
-}
-
-.download-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .delete-button {
