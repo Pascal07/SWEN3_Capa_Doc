@@ -128,6 +128,9 @@
 										<span class="status-badge" [attr.data-status]="document.indexStatus ?? 'PENDING'">
 											Index: {{ document.indexStatus ?? 'PENDING' }}
 										</span>
+										<span class="status-badge" [attr.data-status]="document.summaryStatus ?? 'PENDING'">
+											AI: {{ document.summaryStatus ?? 'PENDING' }}@if (getSummaryEtaLabel(document); as eta) { · {{ eta }}}
+										</span>
 									</p>
 									@if (document.snippet) {
 										<p class="document-row__snippet">„{{ document.snippet }}“</p>
@@ -186,10 +189,36 @@
 					<div><dt>Typ</dt><dd>{{ document.contentType }}</dd></div>
 					<div><dt>Größe</dt><dd>{{ formatSize(document.sizeBytes) }}</dd></div>
 					<div><dt>Hochgeladen</dt><dd>{{ document.uploadedAt | date:'dd.MM.yyyy, HH:mm' }} Uhr</dd></div>
-					<div><dt>Storage-Key</dt><dd>{{ document.storageKey ?? ('documents/' + document.id + '.pdf') }}</dd></div>
 					<div><dt>OCR-Status</dt><dd>{{ document.ocrStatus ?? 'PENDING' }}</dd></div>
 					<div><dt>Index-Status</dt><dd>{{ document.indexStatus ?? 'PENDING' }}</dd></div>
+					<div>
+						<dt>AI-Summary-Status</dt>
+						<dd>
+							{{ document.summaryStatus ?? 'PENDING' }}
+							@if (getSummaryEtaLabel(document); as eta) {
+								<span class="summary-eta">({{ eta }})</span>
+							}
+						</dd>
+					</div>
 				</dl>
+
+				<section class="document-summary" aria-labelledby="document-summary-heading">
+					<h3 id="document-summary-heading">KI-Zusammenfassung</h3>
+					@if (document.summary) {
+						<p class="document-summary__text">{{ document.summary }}</p>
+					} @else if (document.ocrStatus === 'FAILED') {
+						<p class="document-summary__placeholder">Keine Zusammenfassung verfügbar (OCR fehlgeschlagen).</p>
+					} @else if (document.summaryStatus === 'FAILED') {
+						<p class="document-summary__placeholder">Zusammenfassung konnte nicht erstellt werden.</p>
+					} @else {
+						<p class="document-summary__placeholder" role="status">
+							Zusammenfassung wird erstellt…
+							@if (getSummaryEtaLabel(document); as eta) {
+								<span>({{ eta }})</span>
+							}
+						</p>
+					}
+				</section>
 
 				<form (ngSubmit)="saveFilename()">
 					<label class="rename-dialog__label" for="document-filename">Dateiname</label>

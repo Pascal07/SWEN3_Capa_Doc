@@ -165,10 +165,10 @@ services:
         condition: service_healthy
 
   # --- GenAI Worker ---
-  genAI-worker:
+  genai-worker:
     build:
       context: ./GenAIWorker
-    container_name: capadoc-genAI-worker
+    container_name: capadoc-genai-worker
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: docker
@@ -176,13 +176,22 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      OLLAMA_URL: http://ollama:11434
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-180}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-4096}
+      OLLAMA_NUM_PREDICT: ${OLLAMA_NUM_PREDICT:-256}
+      GENAI_MAX_TEXT_LENGTH: ${GENAI_MAX_TEXT_LENGTH:-12000}
+      GENAI_CHUNK_SIZE: ${GENAI_CHUNK_SIZE:-4000}
     depends_on:
       rabbitmq:
         condition: service_healthy
+      ollama:
+        condition: service_healthy
       ollama-pull:
         condition: service_completed_successfully
+      api:
+        condition: service_started
 
   # --- Spring Boot API ---
   api:

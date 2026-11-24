@@ -40,9 +40,11 @@ public class DocumentStatusServiceImpl implements DocumentStatusService {
         }
 
         DocumentEntity document = documentOpt.get();
-        ProcessingStatus currentStatus = (stage == ProcessingStage.OCR)
-                ? document.getOcrStatus()
-                : document.getIndexStatus();
+        ProcessingStatus currentStatus = switch (stage) {
+            case OCR -> document.getOcrStatus();
+            case INDEXING -> document.getIndexStatus();
+            case SUMMARY -> document.getSummaryStatus();
+        };
 
         // Rückschrittsicherheit & Idempotenz: Bereits abgeschlossene Stages (DONE) niemals zurücksetzen
         if (currentStatus == ProcessingStatus.DONE) {
@@ -70,13 +72,16 @@ public class DocumentStatusServiceImpl implements DocumentStatusService {
             document.setOcrStatus(newStatus);
         } else if (stage == ProcessingStage.INDEXING) {
             document.setIndexStatus(newStatus);
+        } else if (stage == ProcessingStage.SUMMARY) {
+            document.setSummaryStatus(newStatus);
         }
 
         if (newStatus == ProcessingStatus.FAILED) {
             document.setErrorMessage(sanitizedError != null ? sanitizedError : (stage + " processing failed"));
         } else if (newStatus == ProcessingStatus.DONE
                 && document.getOcrStatus() != ProcessingStatus.FAILED
-                && document.getIndexStatus() != ProcessingStatus.FAILED) {
+                && document.getIndexStatus() != ProcessingStatus.FAILED
+                && document.getSummaryStatus() != ProcessingStatus.FAILED) {
             document.setErrorMessage(null);
         }
 

@@ -43,6 +43,11 @@ runtime:
           expect(body).to.have.property("uploadedAt");
         });
 
+        test("response contains summary field", function () {
+          const body = res.getBody();
+          expect(body).to.have.property("summary");
+        });
+
         test("returned document has the requested id", function () {
           const body = res.getBody();
           expect(String(body.id)).to.equal(String(bru.getVar("documentId")));
