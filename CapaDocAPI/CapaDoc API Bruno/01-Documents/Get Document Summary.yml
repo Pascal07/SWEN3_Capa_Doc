@@ -1,0 +1,30 @@
+info:
+  name: Get Document Summary
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/documents/{{documentId}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("status is 200 OK", function () {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("response contains non-empty GenAI summary", function () {
+          const body = res.getBody();
+          expect(body).to.have.property("summary");
+          expect(body.summary).to.be.a("string");
+          expect(body.summary.trim().length).to.be.greaterThan(0);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

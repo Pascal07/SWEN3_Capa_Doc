@@ -12,4 +12,8 @@ public interface DocumentMessagePublisher {
     default void publishInvalidStatusEventToDlq(Object invalidPayload) {
         // default no-op for backward compatibility
     }
+
+    default void publishInvalidSummaryResultToDlq(Object invalidPayload) {
+        // default no-op for backward compatibility
+    }
 }

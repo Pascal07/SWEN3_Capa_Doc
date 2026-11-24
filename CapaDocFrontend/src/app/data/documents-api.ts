@@ -10,6 +10,8 @@ export interface DocumentRecord {
   storageKey?: string;
   ocrStatus?: string;
   indexStatus?: string;
+  summaryStatus?: string;
+  summary?: string | null;
   snippet?: string;
 }
 

@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: GenAIWorker
+  main:
+    web-application-type: none
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:capadoc}
+    password: ${SPRING_RABBITMQ_PASSWORD:capadoc}
+    connection-timeout: 5000
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-retries: 3
+          initial-interval: 2s
+          multiplier: 2.0
+          max-interval: 30s
+
+capadoc:
+  rabbitmq:
+    genai:
+      exchange: ${GENAI_RABBITMQ_EXCHANGE:genai.exchange}
+      queue: ${GENAI_RABBITMQ_QUEUE:genai.queue}
+      routingkey: ${GENAI_RABBITMQ_ROUTINGKEY:genai.routingkey}
+      dlx: ${GENAI_RABBITMQ_DLX:genai.dlx}
+      dlq: ${GENAI_RABBITMQ_DLQ:genai.dlq}
+      dlq-routingkey: ${GENAI_RABBITMQ_DLQ_ROUTINGKEY:genai.dlq.routingkey}
+    summary:
+      exchange: ${SUMMARY_RABBITMQ_EXCHANGE:summary.result.exchange}
+      queue: ${SUMMARY_RABBITMQ_QUEUE:summary.result.queue}
+      routingkey: ${SUMMARY_RABBITMQ_ROUTINGKEY:summary.result.routingkey}
+      dlx: ${SUMMARY_RABBITMQ_DLX:summary.result.dlx}
+      dlq: ${SUMMARY_RABBITMQ_DLQ:summary.result.dlq}
+      dlq-routingkey: ${SUMMARY_RABBITMQ_DLQ_ROUTINGKEY:summary.result.dlq.routingkey}
+    status:
+      exchange: ${STATUS_RABBITMQ_EXCHANGE:document.status.exchange}
+      routingkey: ${STATUS_RABBITMQ_ROUTINGKEY:document.status.routingkey}
+
+genai:
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:${OLLAMA_URL:http://localhost:11434}}
+    model: ${OLLAMA_MODEL:qwen2.5:1.5b}
+    connect-timeout-seconds: ${OLLAMA_CONNECT_TIMEOUT_SECONDS:10}
+    read-timeout-seconds: ${OLLAMA_TIMEOUT_SECONDS:180}
+    num-ctx: ${OLLAMA_NUM_CTX:4096}
+    num-predict: ${OLLAMA_NUM_PREDICT:256}
+    temperature: ${OLLAMA_TEMPERATURE:0.2}
+    repeat-penalty: ${OLLAMA_REPEAT_PENALTY:1.15}
+  max-text-length: ${GENAI_MAX_TEXT_LENGTH:12000}
+  chunk-size: ${GENAI_CHUNK_SIZE:4000}
+  chunking-enabled: ${GENAI_CHUNKING_ENABLED:true}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+genai:
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:${OLLAMA_URL:http://ollama:11434}}

@@ -44,7 +44,11 @@ export class Dashboard implements OnInit, OnDestroy {
   readonly searchResults = signal<DocumentRecord[]>([]);
   readonly searchError = signal('');
   readonly searchHint = signal('');
+  readonly nowMs = signal(Date.now());
   private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private summaryPollTimer: ReturnType<typeof setInterval> | null = null;
+  private etaTickTimer: ReturnType<typeof setInterval> | null = null;
+  private listPollTimer: ReturnType<typeof setInterval> | null = null;
 
   readonly displayedDocuments = computed(() =>
     this.isSearchActive() ? this.searchResults() : this.documents(),
@@ -61,6 +65,8 @@ export class Dashboard implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.clearDebounceTimer();
+    this.stopSummaryPolling();
+    this.stopListActivityTimers();
   }
 
   async loadDocuments(): Promise<void> {
@@ -74,6 +80,7 @@ export class Dashboard implements OnInit, OnDestroy {
           (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
         ),
       );
+      this.syncListActivityTimers();
       if (this.isSearchActive() && this.activeSearchQuery()) {
         await this.executeSearch(this.activeSearchQuery());
       }
@@ -254,6 +261,7 @@ export class Dashboard implements OnInit, OnDestroy {
       this.shareLinks.set(links);
       this.editedFilename = this.filenameWithoutExtension(details.filename);
       this.filenameExtension.set(this.extensionOf(details.filename));
+      this.syncSummaryPolling(details);
     } catch (error) {
       this.detailError.set(this.getRequestErrorMessage(
         error,
@@ -266,11 +274,182 @@ export class Dashboard implements OnInit, OnDestroy {
 
   cancelRename(): void {
     if (this.isUpdating() || this.isCreatingShareLink() || this.deletingShareLinkId() !== null) return;
+    this.stopSummaryPolling();
     this.editingDocument.set(null);
     this.editedFilename = '';
     this.filenameExtension.set('');
     this.detailError.set('');
     this.detailMessage.set('');
+  }
+
+  private syncSummaryPolling(document: DocumentRecord): void {
+    this.stopSummaryPolling();
+    if (document.summary || document.ocrStatus === 'FAILED' || document.summaryStatus === 'FAILED') {
+      return;
+    }
+
+    const documentId = document.id;
+    this.summaryPollTimer = setInterval(() => {
+      void this.pollDocumentSummary(documentId);
+    }, 5_000);
+  }
+
+  private async pollDocumentSummary(documentId: number): Promise<void> {
+    if (this.editingDocument()?.id !== documentId) {
+      this.stopSummaryPolling();
+      return;
+    }
+
+    try {
+      const refreshed = await this.documentsApi.get(documentId);
+      if (this.editingDocument()?.id !== documentId) {
+        this.stopSummaryPolling();
+        return;
+      }
+
+      this.editingDocument.set(refreshed);
+      this.documents.update((items) =>
+        items.map((item) => item.id === refreshed.id ? refreshed : item),
+      );
+      this.searchResults.update((items) =>
+        items.map((item) => item.id === refreshed.id ? { ...refreshed, snippet: item.snippet } : item),
+      );
+
+      if (refreshed.summary || refreshed.ocrStatus === 'FAILED' || refreshed.summaryStatus === 'FAILED') {
+        this.stopSummaryPolling();
+      }
+    } catch {
+      // Ignorieren während Background-Polling; manueller Reload bleibt jederzeit möglich
+    }
+  }
+
+  private stopSummaryPolling(): void {
+    if (this.summaryPollTimer !== null) {
+      clearInterval(this.summaryPollTimer);
+      this.summaryPollTimer = null;
+    }
+  }
+
+  getSummaryEtaLabel(doc: DocumentRecord): string | null {
+    if (!this.isSummaryPendingOrRunning(doc)) {
+      return null;
+    }
+
+    const now = this.nowMs();
+    const docUploadedAt = new Date(doc.uploadedAt).getTime();
+    const ownEstimatedTotal = this.estimateSummarySeconds(doc.sizeBytes);
+    const elapsedSeconds = Number.isFinite(docUploadedAt)
+      ? Math.max(0, Math.floor((now - docUploadedAt) / 1000))
+      : 0;
+
+    let remainingSeconds = ownEstimatedTotal - elapsedSeconds;
+
+    // Queue-Position berücksichtigen: Falls dieses Dokument noch PENDING ist,
+    // Restzeit älterer aktiver/wartender Dokumente (Ollama verarbeitet sequentiell) addieren.
+    if ((doc.summaryStatus ?? 'PENDING') !== 'IN_PROGRESS' && Number.isFinite(docUploadedAt)) {
+      const aheadDocs = this.documents().filter((other) => {
+        if (other.id === doc.id || !this.isSummaryPendingOrRunning(other)) {
+          return false;
+        }
+        const otherUploadedAt = new Date(other.uploadedAt).getTime();
+        return Number.isFinite(otherUploadedAt) && otherUploadedAt < docUploadedAt;
+      });
+
+      const queueWaitSeconds = aheadDocs.reduce((sum, other) => {
+        const otherTotal = this.estimateSummarySeconds(other.sizeBytes);
+        const otherElapsed = Math.max(0, Math.floor((now - new Date(other.uploadedAt).getTime()) / 1000));
+        return sum + Math.max(5, otherTotal - otherElapsed);
+      }, 0);
+
+      remainingSeconds = Math.max(ownEstimatedTotal, remainingSeconds) + queueWaitSeconds;
+    }
+
+    if (remainingSeconds <= 0) {
+      return 'gleich fertig…';
+    }
+    return this.formatEtaSeconds(remainingSeconds);
+  }
+
+  private isSummaryPendingOrRunning(doc: DocumentRecord): boolean {
+    if (doc.summary) {
+      return false;
+    }
+    if (doc.ocrStatus === 'FAILED') {
+      return false;
+    }
+    const status = doc.summaryStatus ?? 'PENDING';
+    return status === 'PENDING' || status === 'IN_PROGRESS';
+  }
+
+  private estimateSummarySeconds(sizeBytes: number): number {
+    const safeBytes = Math.max(0, sizeBytes || 0);
+    // Richtwert für CPU-only qwen2.5:1.5b (num_predict=256):
+    // ~25s Basiszeit (OCR + Modell-Eval + ~200-256 Tokens) + ~5s pro 100 KB Dateigröße, gedeckelt auf 180s.
+    return Math.min(180, Math.max(25, Math.round(25 + (safeBytes / 100_000) * 5)));
+  }
+
+  private formatEtaSeconds(totalSeconds: number): string {
+    const rounded = Math.max(1, Math.round(totalSeconds));
+    if (rounded < 60) {
+      return `ca. ${rounded}s`;
+    }
+    const minutes = Math.floor(rounded / 60);
+    const seconds = rounded % 60;
+    return seconds === 0 ? `ca. ${minutes}m` : `ca. ${minutes}m ${seconds}s`;
+  }
+
+  private syncListActivityTimers(): void {
+    const hasPending = this.documents().some((doc) => this.isSummaryPendingOrRunning(doc));
+    if (!hasPending) {
+      this.stopListActivityTimers();
+      return;
+    }
+
+    if (this.etaTickTimer === null) {
+      this.nowMs.set(Date.now());
+      this.etaTickTimer = setInterval(() => {
+        this.nowMs.set(Date.now());
+      }, 1_000);
+    }
+
+    if (this.listPollTimer === null) {
+      this.listPollTimer = setInterval(() => {
+        void this.refreshDocumentsSilently();
+      }, 5_000);
+    }
+  }
+
+  private async refreshDocumentsSilently(): Promise<void> {
+    try {
+      const documents = await this.documentsApi.list();
+      const sorted = [...documents].sort(
+        (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+      );
+      this.documents.set(sorted);
+
+      const currentEditing = this.editingDocument();
+      if (currentEditing) {
+        const updatedEditing = sorted.find((item) => item.id === currentEditing.id);
+        if (updatedEditing) {
+          this.editingDocument.set(updatedEditing);
+        }
+      }
+
+      this.syncListActivityTimers();
+    } catch {
+      // Stilles Background-Polling: Fehler nicht als Banner einblenden
+    }
+  }
+
+  private stopListActivityTimers(): void {
+    if (this.etaTickTimer !== null) {
+      clearInterval(this.etaTickTimer);
+      this.etaTickTimer = null;
+    }
+    if (this.listPollTimer !== null) {
+      clearInterval(this.listPollTimer);
+      this.listPollTimer = null;
+    }
   }
 
   async saveFilename(): Promise<void> {

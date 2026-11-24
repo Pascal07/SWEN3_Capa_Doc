@@ -5,6 +5,7 @@ import at.capadoc.ocrworker.exception.OcrPermanentException;
 import at.capadoc.ocrworker.exception.OcrTransientException;
 import at.capadoc.ocrworker.exception.StorageException;
 import at.capadoc.ocrworker.exception.StorageObjectNotFoundException;
+import at.capadoc.ocrworker.model.GenAiMessage;
 import at.capadoc.ocrworker.model.IndexingMessage;
 import at.capadoc.ocrworker.model.OcrMessage;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ public class OcrMessageListener {
     private final StorageService storageService;
     private final OcrService ocrService;
     private final IndexingMessagePublisher indexingMessagePublisher;
+    private final GenAiMessagePublisher genAiMessagePublisher;
     private final StatusPublisher statusPublisher;
     private final OcrProperties ocrProperties;
 
@@ -29,11 +31,13 @@ public class OcrMessageListener {
             StorageService storageService,
             OcrService ocrService,
             IndexingMessagePublisher indexingMessagePublisher,
+            GenAiMessagePublisher genAiMessagePublisher,
             StatusPublisher statusPublisher,
             OcrProperties ocrProperties) {
         this.storageService = storageService;
         this.ocrService = ocrService;
         this.indexingMessagePublisher = indexingMessagePublisher;
+        this.genAiMessagePublisher = genAiMessagePublisher;
         this.statusPublisher = statusPublisher;
         this.ocrProperties = ocrProperties;
     }
@@ -42,12 +46,21 @@ public class OcrMessageListener {
             StorageService storageService,
             OcrService ocrService,
             IndexingMessagePublisher indexingMessagePublisher,
+            StatusPublisher statusPublisher,
+            OcrProperties ocrProperties) {
+        this(storageService, ocrService, indexingMessagePublisher, null, statusPublisher, ocrProperties);
+    }
+
+    public OcrMessageListener(
+            StorageService storageService,
+            OcrService ocrService,
+            IndexingMessagePublisher indexingMessagePublisher,
             StatusPublisher statusPublisher) {
-        this(storageService, ocrService, indexingMessagePublisher, statusPublisher, new OcrProperties());
+        this(storageService, ocrService, indexingMessagePublisher, null, statusPublisher, new OcrProperties());
     }
 
     public OcrMessageListener() {
-        this(null, null, null, null, new OcrProperties());
+        this(null, null, null, null, null, new OcrProperties());
     }
 
     @RabbitListener(
@@ -90,7 +103,7 @@ public class OcrMessageListener {
                 log.info("OCR completed for documentId={} (extracted {} characters)",
                         documentId, extractedText != null ? extractedText.length() : 0);
 
-                // Reihenfolge im Erfolgsfall: Erst Folgenachricht an Indexing-Queue senden, dann DONE melden
+                // Reihenfolge im Erfolgsfall: Erst Folgenachrichten an Indexing- & GenAI-Queue senden, dann DONE melden
                 if (indexingMessagePublisher != null) {
                     IndexingMessage indexingMessage = IndexingMessage.builder()
                             .documentId(documentId)
@@ -101,6 +114,15 @@ public class OcrMessageListener {
                             .processedAt(LocalDateTime.now())
                             .build();
                     indexingMessagePublisher.publishIndexingMessage(indexingMessage);
+                }
+
+                if (genAiMessagePublisher != null) {
+                    GenAiMessage genAiMessage = GenAiMessage.builder()
+                            .documentId(documentId)
+                            .filename(message.getFilename())
+                            .extractedText(extractedText != null ? extractedText : "")
+                            .build();
+                    genAiMessagePublisher.publishGenAiMessage(genAiMessage);
                 }
 
                 if (statusPublisher != null) {

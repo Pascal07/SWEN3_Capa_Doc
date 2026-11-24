@@ -110,7 +110,59 @@ public class RabbitMqConfig {
                 .with(routingKey);
     }
 
-    // 4. Status-Exchange, Queue & Dead-Letter-Queue (für Status-Updates an den REST-Server)
+    // 4. GenAI-Exchange, Queue & Dead-Letter-Queue (Ziel-Queue nach erfolgreicher OCR)
+    @Bean
+    public DirectExchange genAiDeadLetterExchange(
+            @Value("${capadoc.rabbitmq.genai.dlx:genai.dlx}") String dlxName) {
+        return new DirectExchange(dlxName);
+    }
+
+    @Bean
+    public Queue genAiDeadLetterQueue(
+            @Value("${capadoc.rabbitmq.genai.dlq:genai.dlq}") String dlqName) {
+        return QueueBuilder.durable(dlqName).build();
+    }
+
+    @Bean
+    public Binding genAiDlqBinding(
+            Queue genAiDeadLetterQueue,
+            DirectExchange genAiDeadLetterExchange,
+            @Value("${capadoc.rabbitmq.genai.dlq.routingkey:genai.dlq.routingkey}") String dlqRoutingKey) {
+        return BindingBuilder
+                .bind(genAiDeadLetterQueue)
+                .to(genAiDeadLetterExchange)
+                .with(dlqRoutingKey);
+    }
+
+    @Bean
+    public DirectExchange genAiExchange(
+            @Value("${capadoc.rabbitmq.genai.exchange:genai.exchange}") String exchangeName) {
+        return new DirectExchange(exchangeName);
+    }
+
+    @Bean
+    public Queue genAiQueue(
+            @Value("${capadoc.rabbitmq.genai.queue:genai.queue}") String queueName,
+            @Value("${capadoc.rabbitmq.genai.dlx:genai.dlx}") String deadLetterExchange,
+            @Value("${capadoc.rabbitmq.genai.dlq.routingkey:genai.dlq.routingkey}") String deadLetterRoutingKey) {
+        return QueueBuilder.durable(queueName)
+                .withArgument("x-dead-letter-exchange", deadLetterExchange)
+                .withArgument("x-dead-letter-routing-key", deadLetterRoutingKey)
+                .build();
+    }
+
+    @Bean
+    public Binding genAiBinding(
+            Queue genAiQueue,
+            DirectExchange genAiExchange,
+            @Value("${capadoc.rabbitmq.genai.routingkey:genai.routingkey}") String routingKey) {
+        return BindingBuilder
+                .bind(genAiQueue)
+                .to(genAiExchange)
+                .with(routingKey);
+    }
+
+    // 5. Status-Exchange, Queue & Dead-Letter-Queue (für Status-Updates an den REST-Server)
     @Bean
     public DirectExchange statusDeadLetterExchange(
             @Value("${capadoc.rabbitmq.status.dlx:document.status.dlx}") String dlxName) {

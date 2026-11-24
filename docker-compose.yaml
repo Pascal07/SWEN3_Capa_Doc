@@ -90,6 +90,33 @@ services:
       elasticsearch:
         condition: service_healthy
 
+  # --- Ollama LLM Server (CPU-Only, läuft auf PC & Laptop identisch) ---
+  ollama:
+    image: ollama/ollama:latest
+    container_name: capadoc-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # --- Automatischer Modell-Download beim ersten Start ---
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: capadoc-ollama-pull
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "ollama pull qwen2.5:1.5b"]
+    restart: "no"
+
   # --- OCR Worker ---
   ocr-worker:
     build:
@@ -136,6 +163,35 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+
+  # --- GenAI Worker ---
+  genai-worker:
+    build:
+      context: ./GenAIWorker
+    container_name: capadoc-genai-worker
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-180}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-4096}
+      OLLAMA_NUM_PREDICT: ${OLLAMA_NUM_PREDICT:-256}
+      GENAI_MAX_TEXT_LENGTH: ${GENAI_MAX_TEXT_LENGTH:-12000}
+      GENAI_CHUNK_SIZE: ${GENAI_CHUNK_SIZE:-4000}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
 
   # --- Spring Boot API ---
   api:
@@ -196,3 +252,4 @@ volumes:
   db-data:
   rustfs-data:
   elasticsearch-data:
+  ollama-data:

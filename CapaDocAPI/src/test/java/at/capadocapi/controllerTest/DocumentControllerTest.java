@@ -541,4 +541,15 @@ class DocumentControllerTest {
                 .andExpect(jsonPath("$.message")
                         .value("The search service is currently unavailable. Please try again later."));
     }
+
+    @Test
+    void getDocumentById_includesSummaryFieldInResponse() throws Exception {
+        sampleEntity.setSummary("Kompakte KI-Zusammenfassung des Berichts.");
+        when(documentService.getDocumentById(1L)).thenReturn(Optional.of(sampleEntity));
+
+        mockMvc.perform(get("/documents/1").with(oidcLogin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.summary").value("Kompakte KI-Zusammenfassung des Berichts."));
+    }
 }

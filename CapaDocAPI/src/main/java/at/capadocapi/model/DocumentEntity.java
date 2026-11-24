@@ -43,8 +43,16 @@ public class DocumentEntity {
     @Column(name = "index_status", columnDefinition = "varchar(32) default 'PENDING'")
     private ProcessingStatus indexStatus = ProcessingStatus.PENDING;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "summary_status", length = 32)
+    private ProcessingStatus summaryStatus = ProcessingStatus.PENDING;
+
     @Column(name = "error_message", length = 512)
     private String errorMessage;
+
+    @Column(name = "summary", columnDefinition = "TEXT")
+    private String summary;
 
     // m:n relation to ShareLink – owning side lives here
     @Builder.Default
@@ -68,6 +76,9 @@ public class DocumentEntity {
         }
         if (indexStatus == null) {
             indexStatus = ProcessingStatus.PENDING;
+        }
+        if (summaryStatus == null) {
+            summaryStatus = ProcessingStatus.PENDING;
         }
     }
 }

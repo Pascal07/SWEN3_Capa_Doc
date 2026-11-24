@@ -36,6 +36,9 @@ public class DatabaseSchemaUpdater {
                 stmt.execute("ALTER TABLE documents DROP CONSTRAINT IF EXISTS documents_index_status_check");
                 stmt.execute("ALTER TABLE documents ADD CONSTRAINT documents_index_status_check " +
                         "CHECK (index_status IN ('PENDING', 'IN_PROGRESS', 'DONE', 'FAILED'))");
+                stmt.execute("ALTER TABLE documents DROP CONSTRAINT IF EXISTS documents_summary_status_check");
+                stmt.execute("ALTER TABLE documents ADD CONSTRAINT documents_summary_status_check " +
+                        "CHECK (summary_status IN ('PENDING', 'IN_PROGRESS', 'DONE', 'FAILED'))");
                 log.debug("Ensured PostgreSQL check constraints on documents allow IN_PROGRESS.");
             }
         } catch (Exception ex) {

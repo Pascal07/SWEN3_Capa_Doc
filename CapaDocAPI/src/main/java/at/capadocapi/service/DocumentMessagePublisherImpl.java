@@ -22,6 +22,8 @@ public class DocumentMessagePublisherImpl implements DocumentMessagePublisher {
     private final String indexingRoutingKey;
     private final String statusDlxName;
     private final String statusDlqRoutingKey;
+    private final String summaryDlxName;
+    private final String summaryDlqRoutingKey;
 
     @Autowired
     public DocumentMessagePublisherImpl(
@@ -31,7 +33,9 @@ public class DocumentMessagePublisherImpl implements DocumentMessagePublisher {
             @Value("${capadoc.rabbitmq.indexing.exchange:indexing.exchange}") String indexingExchangeName,
             @Value("${capadoc.rabbitmq.indexing.routingkey:indexing.routingkey}") String indexingRoutingKey,
             @Value("${capadoc.rabbitmq.status.dlx:document.status.dlx}") String statusDlxName,
-            @Value("${capadoc.rabbitmq.status.dlq.routingkey:document.status.dlq.routingkey}") String statusDlqRoutingKey) {
+            @Value("${capadoc.rabbitmq.status.dlq.routingkey:document.status.dlq.routingkey}") String statusDlqRoutingKey,
+            @Value("${capadoc.rabbitmq.summary.dlx:summary.result.dlx}") String summaryDlxName,
+            @Value("${capadoc.rabbitmq.summary.dlq.routingkey:summary.result.dlq.routingkey}") String summaryDlqRoutingKey) {
         this.rabbitTemplate = rabbitTemplate;
         this.exchangeName = exchangeName;
         this.routingKey = routingKey;
@@ -39,6 +43,8 @@ public class DocumentMessagePublisherImpl implements DocumentMessagePublisher {
         this.indexingRoutingKey = indexingRoutingKey;
         this.statusDlxName = statusDlxName;
         this.statusDlqRoutingKey = statusDlqRoutingKey;
+        this.summaryDlxName = summaryDlxName;
+        this.summaryDlqRoutingKey = summaryDlqRoutingKey;
     }
 
     public DocumentMessagePublisherImpl(
@@ -54,7 +60,9 @@ public class DocumentMessagePublisherImpl implements DocumentMessagePublisher {
                 indexingExchangeName,
                 indexingRoutingKey,
                 "document.status.dlx",
-                "document.status.dlq.routingkey"
+                "document.status.dlq.routingkey",
+                "summary.result.dlx",
+                "summary.result.dlq.routingkey"
         );
     }
 
@@ -69,7 +77,9 @@ public class DocumentMessagePublisherImpl implements DocumentMessagePublisher {
                 "indexing.exchange",
                 "indexing.routingkey",
                 "document.status.dlx",
-                "document.status.dlq.routingkey"
+                "document.status.dlq.routingkey",
+                "summary.result.dlx",
+                "summary.result.dlq.routingkey"
         );
     }
 
@@ -116,6 +126,17 @@ public class DocumentMessagePublisherImpl implements DocumentMessagePublisher {
                     invalidPayload != null ? invalidPayload : "null-status-event");
         } catch (AmqpException ex) {
             log.error("Failed to forward invalid DocumentStatusEvent payload to dead-letter queue", ex);
+        }
+    }
+
+    @Override
+    public void publishInvalidSummaryResultToDlq(Object invalidPayload) {
+        try {
+            log.warn("Forwarding invalid SummaryResultMessage payload to dead-letter exchange '{}'", summaryDlxName);
+            rabbitTemplate.convertAndSend(summaryDlxName, summaryDlqRoutingKey,
+                    invalidPayload != null ? invalidPayload : "null-summary-result");
+        } catch (AmqpException ex) {
+            log.error("Failed to forward invalid SummaryResultMessage payload to dead-letter queue", ex);
         }
     }
 }
