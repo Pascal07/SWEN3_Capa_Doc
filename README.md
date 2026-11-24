@@ -7,6 +7,9 @@
 [![Elasticsearch](https://img.shields.io/badge/Elasticsearch-9.4.5-005571.svg?style=flat&logo=elasticsearch)](https://www.elastic.co/elasticsearch)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg?style=flat&logo=docker)](https://www.docker.com/)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3--management--alpine-orange.svg?style=flat&logo=rabbitmq)](https://www.rabbitmq.com/)
+[![Ollama](https://img.shields.io/badge/Ollama-CPU--only-6CC24A.svg?style=flat&logo=ollama)](https://ollama.com/)
+[![Tesseract OCR](https://img.shields.io/badge/Tesseract_OCR-4.1.1-blue.svg?style=flat&logo=tesseract)](https://github.com/tesseract-ocr/tesseract)
+
 
 A Document Management System (DMS) designed for archiving documents with automated OCR processing, Gen-AI summaries, tagging, and full-text search.
 
