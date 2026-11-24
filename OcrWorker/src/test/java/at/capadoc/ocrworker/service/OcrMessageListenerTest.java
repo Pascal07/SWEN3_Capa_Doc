@@ -5,6 +5,7 @@ import at.capadoc.ocrworker.exception.OcrPermanentException;
 import at.capadoc.ocrworker.exception.OcrTransientException;
 import at.capadoc.ocrworker.exception.StorageObjectNotFoundException;
 import at.capadoc.ocrworker.model.DocumentStatusEvent;
+import at.capadoc.ocrworker.model.GenAiMessage;
 import at.capadoc.ocrworker.model.IndexingMessage;
 import at.capadoc.ocrworker.model.OcrMessage;
 import at.capadoc.ocrworker.model.ProcessingStage;
@@ -41,6 +42,9 @@ class OcrMessageListenerTest {
     private IndexingMessagePublisher indexingMessagePublisher;
 
     @Mock
+    private GenAiMessagePublisher genAiMessagePublisher;
+
+    @Mock
     private RabbitTemplate rabbitTemplate;
 
     private StatusPublisher statusPublisher;
@@ -63,6 +67,7 @@ class OcrMessageListenerTest {
                 storageService,
                 ocrService,
                 indexingMessagePublisher,
+                genAiMessagePublisher,
                 statusPublisher,
                 ocrProperties
         );
@@ -102,11 +107,18 @@ class OcrMessageListenerTest {
         verify(storageService).download("documents/42/uuid-invoice.pdf");
         verify(ocrService).extractText(pdfBytes);
 
-        // Verify strict order: IN_PROGRESS -> publishIndexingMessage -> DONE
-        InOrder inOrder = inOrder(statusPublisher, indexingMessagePublisher);
+        // Verify strict order: IN_PROGRESS -> publishIndexingMessage -> publishGenAiMessage -> DONE
+        InOrder inOrder = inOrder(statusPublisher, indexingMessagePublisher, genAiMessagePublisher);
         inOrder.verify(statusPublisher).publishInProgress(42L);
         inOrder.verify(indexingMessagePublisher).publishIndexingMessage(any(IndexingMessage.class));
+        inOrder.verify(genAiMessagePublisher).publishGenAiMessage(any(GenAiMessage.class));
         inOrder.verify(statusPublisher).publishDone(42L);
+
+        ArgumentCaptor<GenAiMessage> genAiCaptor = ArgumentCaptor.forClass(GenAiMessage.class);
+        verify(genAiMessagePublisher).publishGenAiMessage(genAiCaptor.capture());
+        assertThat(genAiCaptor.getValue().getDocumentId()).isEqualTo(42L);
+        assertThat(genAiCaptor.getValue().getFilename()).isEqualTo("invoice.pdf");
+        assertThat(genAiCaptor.getValue().getExtractedText()).isEqualTo("Rechnung Nr. 2026-001");
 
         ArgumentCaptor<IndexingMessage> indexingCaptor = ArgumentCaptor.forClass(IndexingMessage.class);
         verify(indexingMessagePublisher).publishIndexingMessage(indexingCaptor.capture());

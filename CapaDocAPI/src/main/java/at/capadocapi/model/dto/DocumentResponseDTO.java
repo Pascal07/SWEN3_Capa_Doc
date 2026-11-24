@@ -24,6 +24,8 @@ public class DocumentResponseDTO {
     private String storageKey;
     private ProcessingStatus ocrStatus;
     private ProcessingStatus indexStatus;
+    private ProcessingStatus summaryStatus;
+    private String summary;
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String errorMessage;

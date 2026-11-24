@@ -59,6 +59,24 @@ public class RabbitMQConfig {
     @Value("${capadoc.rabbitmq.status.dlq.routingkey:document.status.dlq.routingkey}")
     private String statusDlqRoutingKey;
 
+    @Value("${capadoc.rabbitmq.summary.exchange:summary.result.exchange}")
+    private String summaryExchangeName;
+
+    @Value("${capadoc.rabbitmq.summary.queue:summary.result.queue}")
+    private String summaryQueueName;
+
+    @Value("${capadoc.rabbitmq.summary.routingkey:summary.result.routingkey}")
+    private String summaryRoutingKey;
+
+    @Value("${capadoc.rabbitmq.summary.dlx:summary.result.dlx}")
+    private String summaryDlxName;
+
+    @Value("${capadoc.rabbitmq.summary.dlq:summary.result.dlq}")
+    private String summaryDlqName;
+
+    @Value("${capadoc.rabbitmq.summary.dlq.routingkey:summary.result.dlq.routingkey}")
+    private String summaryDlqRoutingKey;
+
     // 1. Dead-Letter-Exchange & Queue (für fehlerhafte OCR-Nachrichten)
     @Bean
     public DirectExchange deadLetterExchange() {
@@ -142,6 +160,48 @@ public class RabbitMQConfig {
     @Bean
     public Binding statusBinding(Queue statusQueue, DirectExchange statusExchange) {
         return BindingBuilder.bind(statusQueue).to(statusExchange).with(statusRoutingKey);
+    }
+
+    // 2d. Summary-Result-Exchange, Queue & Dead-Letter-Queue (Empfängt GenAI-Zusammenfassungen)
+    @Bean
+    public DirectExchange summaryResultDeadLetterExchange() {
+        return new DirectExchange(summaryDlxName);
+    }
+
+    @Bean
+    public Queue summaryResultDeadLetterQueue() {
+        return QueueBuilder.durable(summaryDlqName).build();
+    }
+
+    @Bean
+    public Binding summaryResultDlqBinding(
+            Queue summaryResultDeadLetterQueue,
+            DirectExchange summaryResultDeadLetterExchange) {
+        return BindingBuilder.bind(summaryResultDeadLetterQueue)
+                .to(summaryResultDeadLetterExchange)
+                .with(summaryDlqRoutingKey);
+    }
+
+    @Bean
+    public DirectExchange summaryResultExchange() {
+        return new DirectExchange(summaryExchangeName);
+    }
+
+    @Bean
+    public Queue summaryResultQueue() {
+        return QueueBuilder.durable(summaryQueueName)
+                .withArgument("x-dead-letter-exchange", summaryDlxName)
+                .withArgument("x-dead-letter-routing-key", summaryDlqRoutingKey)
+                .build();
+    }
+
+    @Bean
+    public Binding summaryResultBinding(
+            Queue summaryResultQueue,
+            DirectExchange summaryResultExchange) {
+        return BindingBuilder.bind(summaryResultQueue)
+                .to(summaryResultExchange)
+                .with(summaryRoutingKey);
     }
 
     // 3. JSON Converter (mit INFERRED TypePrecedence für modulübergreifende DTO-Deserialisierung)

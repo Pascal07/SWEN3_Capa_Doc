@@ -222,6 +222,39 @@
   color: #355e3e;
 }
 
+.document-summary {
+  margin: 0 0 1.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #d9e2dc;
+  border-radius: 6px;
+  background: #f7faf8;
+}
+
+.document-summary h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.95rem;
+  color: #233a2b;
+}
+
+.document-summary__text {
+  margin: 0;
+  line-height: 1.5;
+  color: #1f2933;
+  white-space: pre-line;
+}
+
+.document-summary__placeholder {
+  margin: 0;
+  font-style: italic;
+  color: #5c6b61;
+}
+
+.summary-eta {
+  color: #5c6b61;
+  font-weight: 400;
+  margin-left: 0.25rem;
+}
+
 button:focus-visible {
   outline: 3px solid #233a2b;
   outline-offset: 3px;

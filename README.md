@@ -7,6 +7,9 @@
 [![Elasticsearch](https://img.shields.io/badge/Elasticsearch-9.4.5-005571.svg?style=flat&logo=elasticsearch)](https://www.elastic.co/elasticsearch)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg?style=flat&logo=docker)](https://www.docker.com/)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3--management--alpine-orange.svg?style=flat&logo=rabbitmq)](https://www.rabbitmq.com/)
+[![Ollama](https://img.shields.io/badge/Ollama-CPU--only-6CC24A.svg?style=flat&logo=ollama)](https://ollama.com/)
+[![Tesseract OCR](https://img.shields.io/badge/Tesseract_OCR-4.1.1-blue.svg?style=flat&logo=tesseract)](https://github.com/tesseract-ocr/tesseract)
+
 
 A Document Management System (DMS) designed for archiving documents with automated OCR processing, Gen-AI summaries, tagging, and full-text search.
 
@@ -33,6 +36,8 @@ A Document Management System (DMS) designed for archiving documents with automat
 | **OCR Engine** | Tesseract OCR & Ghostscript | Local container execution (`deu+eng`, 300 DPI) |
 | **Search Engine** | Elasticsearch | 9.4.5 (`co.elastic.clients:elasticsearch-java:9.4.5`) |
 | **Indexing Worker** | Spring Boot (`IndexWorker`) | Consumes `indexing.queue`, indexes/deletes in Elasticsearch |
+| **GenAI LLM Server** | Ollama (CPU-only) | `ollama/ollama:latest` with local model `qwen2.5:1.5b` (no API key) |
+| **GenAI Worker** | Spring Boot (`GenAIWorker`) | Consumes `genai.queue`, generates summaries via Ollama, publishes to `summary.result.queue` |
 | **Containerization**| Docker & Docker Compose | Multi-stage build |
 | **API Testing** | Bruno | Pre-configured collection |
 
@@ -87,6 +92,8 @@ A Document Management System (DMS) designed for archiving documents with automat
    - **RabbitMQ Management UI:** Available at `http://localhost:15672`
    - **OCR Worker:** Running as the `ocr-worker` container (stateless, no DB connection)
    - **Indexing Worker:** Running as the `index-worker` container (stateless, no DB connection)
+   - **Ollama LLM Server:** Running on port `11434` (`ollama-pull` downloads `qwen2.5:1.5b` automatically on first startup)
+   - **GenAI Worker:** Running as the `genai-worker` container (stateless, no DB connection)
 
 3. **Monitor Logs**
 
@@ -99,7 +106,7 @@ A Document Management System (DMS) designed for archiving documents with automat
    Or follow logs for the API / Workers specifically:
 
    ```bash
-   docker compose logs -f api ocr-worker index-worker
+   docker compose logs -f api ocr-worker index-worker genai-worker ollama
    ```
 
 4. **Stop the Services**
@@ -218,6 +225,7 @@ For component relationships and message flow, see
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 [`docs/ELASTICSEARCH_INDEXING_AND_SEARCH.md`](docs/ELASTICSEARCH_INDEXING_AND_SEARCH.md),
 [`docs/OCR_WORKER.md`](docs/OCR_WORKER.md),
+[`docs/AI_WORKER.md`](docs/AI_WORKER.md),
 [`docs/RUSTFS_OBJECT_STORAGE.md`](docs/RUSTFS_OBJECT_STORAGE.md), and
 [`docs/OAUTH2_GOOGLE_LOGIN.md`](docs/OAUTH2_GOOGLE_LOGIN.md).
 
@@ -262,9 +270,9 @@ A pre-configured Bruno collection is included in the repository:
 
 If you prefer to run the Spring Boot API and Workers directly on your host machine:
 
-1. **Start infrastructure services (PostgreSQL, RabbitMQ, RustFS, Elasticsearch)**:
+1. **Start infrastructure services (PostgreSQL, RabbitMQ, RustFS, Elasticsearch, Ollama)**:
    ```bash
-   docker compose up -d db rabbitmq rustfs elasticsearch
+   docker compose up -d db rabbitmq rustfs elasticsearch ollama ollama-pull
    ```
 
 2. **Run the backend API using the Maven wrapper**:
@@ -285,9 +293,16 @@ If you prefer to run the Spring Boot API and Workers directly on your host machi
    ./mvnw spring-boot:run
    ```
 
-5. **Run unit & integration tests**:
+5. **Run the GenAI Worker locally**:
+   ```bash
+   cd GenAIWorker
+   ./mvnw spring-boot:run
+   ```
+
+6. **Run unit & integration tests**:
    ```bash
    cd CapaDocAPI && ./mvnw test
    cd ../OcrWorker && ./mvnw test
    cd ../IndexWorker && ./mvnw test
+   cd ../GenAIWorker && ./mvnw test
    ```

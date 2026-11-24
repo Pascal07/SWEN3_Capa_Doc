@@ -117,6 +117,9 @@ public class DocumentServiceImpl implements DocumentService {
         if (documentEntity.getIndexStatus() == null) {
             documentEntity.setIndexStatus(ProcessingStatus.PENDING);
         }
+        if (documentEntity.getSummaryStatus() == null) {
+            documentEntity.setSummaryStatus(ProcessingStatus.PENDING);
+        }
 
         final DocumentEntity savedEntity;
         try {
@@ -159,6 +162,9 @@ public class DocumentServiceImpl implements DocumentService {
         }
         if (documentEntity.getIndexStatus() == null) {
             documentEntity.setIndexStatus(ProcessingStatus.PENDING);
+        }
+        if (documentEntity.getSummaryStatus() == null) {
+            documentEntity.setSummaryStatus(ProcessingStatus.PENDING);
         }
 
         final DocumentEntity createdEntity;
